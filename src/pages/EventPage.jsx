@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Users, Info, ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react';
 
 const SAMPLE_EVENTS = [
-  { id: 'e1', title: 'Coastline Reforestation', category: 'Environment', date: 'Feb 28, 2026', location: 'Sunset Cove', summary: 'Plant native mangroves to prevent erosion.', details: 'Bring water and gloves. Tools provided.' },
-  { id: 'e2', title: 'Community Garden Build', category: 'Community', date: 'Mar 5, 2026', location: 'Downtown', summary: 'Create raised beds and plant seedlings.', details: 'No experience required.' },
-  { id: 'e3', title: 'Beach Cleanup', category: 'Environment', date: 'Feb 21, 2026', location: 'North Beach', summary: 'Collect debris and sort recyclables.', details: 'Bring sun protection and reusable gloves.' },
+  { id: 1, title: 'CP Workshop: Graph Theory', category: 'Workshop', date: 'Feb 10, 2026', location: 'Central Lab', summary: 'Master complex algorithms with top competitive programmers.', details: 'Bring a laptop. Hands-on sessions with problem sets.' },
+  { id: 2, title: 'Robotics 101: Arduino', category: 'Workshop', date: 'Feb 15, 2026', location: 'WRE Workshop', summary: 'Basics of hardware integration and sensor control.', details: 'Tools and boards provided; limited seats.' },
+  { id: 3, title: 'Basanta Utsav Rehearsal', category: 'Cultural', date: 'Feb 20, 2026', location: 'Gol Chattar', summary: 'Cultural rehearsal and preparation for spring festival.', details: 'Open to performers and helpers; costume briefing included.' },
+  { id: 4, title: 'IEEE Seminar: AI in Power', category: 'Seminar', date: 'Feb 25, 2026', location: 'ECE Seminar Hall', summary: 'Exploring AI applications in modern power grids.', details: 'Includes guest speakers from industry and research.' },
 ];
 
 export default function EventPage({ selectedEventId, setSelectedEvent, setCurrentPage }) {
