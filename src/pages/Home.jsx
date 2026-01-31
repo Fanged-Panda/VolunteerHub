@@ -1,41 +1,9 @@
 import React, { useState } from 'react';
 
-export default function App({ setCurrentPage, setSelectedEvent }) {
+export default function App({ events = [], setEvents, setCurrentPage, setSelectedEvent }) {
   const [authMode, setAuthMode] = useState(null); // 'login' | 'register' | null
-const upcoming = [
-  { 
-    id: 1, 
-    title: 'CP Workshop: Graph Theory', 
-    club: 'CUET Computer Club', 
-    date: 'Feb 10', 
-    location: 'Central Lab',
-    desc: 'Master complex algorithms with the top competitive programmers of CUET.' 
-  },
-  { 
-    id: 2, 
-    title: 'Robotics 101: Arduino', 
-    club: 'ASRRO', 
-    date: 'Feb 15', 
-    location: 'WRE Workshop',
-    desc: 'Learn the basics of hardware integration and sensor control for your next bot.' 
-  },
-  { 
-    id: 3, 
-    title: 'Basanta Utsav Rehearsal', 
-    club: 'Joydhoni', 
-    date: 'Feb 20', 
-    location: 'Gol Chattar',
-    desc: 'Join the cultural heartbeat of CUET as we prepare for the spring festival.' 
-  },
-  { 
-    id: 4, 
-    title: 'IEEE Seminar: AI in Power', 
-    club: 'IEEE CUET SB', 
-    date: 'Feb 25', 
-    location: 'ECE Seminar Hall',
-    desc: 'Exploring the intersection of artificial intelligence and modern power grids.' 
-  }
-];
+
+  const upcoming = events.slice(0, 4);
 
   return (
     <div className="min-h-full bg-white text-slate-900 font-sans selection:bg-orange-100">
@@ -83,7 +51,7 @@ const upcoming = [
 <section className="max-w-6xl mx-auto px-10 pb-20 mt-12 md:mt-16 lg:mt-24">
   <h2 className="text-2xl font-bold mb-6">Upcoming Events</h2>
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-    {upcoming.map((e) => (
+          {upcoming.map((e) => (
       <div key={e.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between h-full">
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -93,7 +61,7 @@ const upcoming = [
               <h3 className="font-bold text-lg">{e.title}</h3>
             </div>
           </div>
-          <p className="text-sm text-slate-500 mb-4">Join {e.club} for {e.title} at {e.location}. Make your impact on campus.</p>
+          <p className="text-sm text-slate-500 mb-4">{e.summary || e.desc || `Join ${e.club} for ${e.title} at ${e.location}.`}</p>
         </div>
 
         <div className="flex gap-3 mt-auto">

@@ -8,13 +8,14 @@ const SAMPLE_EVENTS = [
   { id: 4, title: 'IEEE Seminar: AI in Power', category: 'Seminar', date: 'Feb 25, 2026', location: 'ECE Seminar Hall', summary: 'Exploring AI applications in modern power grids.', details: 'Includes guest speakers from industry and research.' },
 ];
 
-export default function EventPage({ selectedEventId, setSelectedEvent, setCurrentPage }) {
-  const [events] = useState(SAMPLE_EVENTS);
+export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}, selectedEventId, setSelectedEvent, setCurrentPage }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [filtered, setFiltered] = useState(events);
-  const [selected, setSelected] = useState(events[0]);
+  const [selected, setSelected] = useState(events[0] || null);
   const [appliedIds, setAppliedIds] = useState(new Set());
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState(null);
 
   useEffect(() => {
     const raw = localStorage.getItem('appliedEvents');
@@ -31,6 +32,7 @@ export default function EventPage({ selectedEventId, setSelectedEvent, setCurren
       const found = events.find((ev) => ev.id === selectedEventId);
       if (found) setSelected(found);
     }
+    else if (events.length > 0 && !selected) setSelected(events[0]);
   }, [selectedEventId, events]);
 
   useEffect(() => {
@@ -48,6 +50,23 @@ export default function EventPage({ selectedEventId, setSelectedEvent, setCurren
     else setCopy.add(id);
     setAppliedIds(setCopy);
     localStorage.setItem('appliedEvents', JSON.stringify(Array.from(setCopy)));
+  }
+
+  function startEdit(ev) {
+    setEditForm({ ...ev });
+    setIsEditing(true);
+  }
+
+  function saveEdit() {
+    setEvents((prev) => prev.map((p) => (p.id === editForm.id ? { ...editForm } : p)));
+    setIsEditing(false);
+    setSelected(editForm);
+    setEditForm(null);
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+    setEditForm(null);
   }
 
   const categories = ['All', ...Array.from(new Set(events.map((e) => e.category)))];
@@ -106,6 +125,11 @@ export default function EventPage({ selectedEventId, setSelectedEvent, setCurren
                 <h1 className="text-3xl font-black mb-4">{selected.title}</h1>
                 <p className="text-slate-600 mb-6">{selected.details}</p>
 
+                <div className="flex gap-3 mb-4">
+                  <button onClick={() => startEdit(selected)} className="px-3 py-2 bg-white border rounded">Edit Event</button>
+                  <button onClick={() => { setCurrentPage?.('home'); setSelectedEvent?.(null); }} className="px-3 py-2 bg-white border rounded">Back to Home</button>
+                </div>
+
                 <div className="flex gap-4 items-center">
                   <button onClick={() => toggleApply(selected.id)} className={`px-6 py-3 rounded-2xl font-bold ${appliedIds.has(selected.id) ? 'bg-slate-900 text-white' : 'bg-orange-500 text-white'}`}>
                     {appliedIds.has(selected.id) ? 'Withdraw Application' : 'Apply to This Event'}
@@ -114,6 +138,23 @@ export default function EventPage({ selectedEventId, setSelectedEvent, setCurren
                     <Share2 size={16} /> Share
                   </button>
                 </div>
+
+                {isEditing && editForm && (
+                  <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                    <h3 className="font-bold mb-3">Edit Event</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      <input className="p-2 border" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+                      <input className="p-2 border" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+                      <input className="p-2 border" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
+                      <input className="p-2 border" value={editForm.summary} onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })} />
+                      <textarea className="p-2 border" value={editForm.details} onChange={(e) => setEditForm({ ...editForm, details: e.target.value })} />
+                      <div className="flex gap-2">
+                        <button onClick={saveEdit} className="px-3 py-2 bg-orange-500 text-white rounded">Save</button>
+                        <button onClick={cancelEdit} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
