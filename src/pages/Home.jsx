@@ -9,7 +9,7 @@ export default function App({ setCurrentPage, setSelectedEvent }) {
   ];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-orange-100">
+    <div className="min-h-full bg-white text-slate-900 font-sans selection:bg-orange-100">
       {/* Navbar */}
       <nav className="flex items-center justify-between px-10 py-6 sticky top-0 bg-white/80 backdrop-blur-md z-50">
         <div className="flex items-center gap-2">

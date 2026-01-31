@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, Award, MapPin } from 'lucide-react';
+import { Calendar, Clock, Award, MapPin, ArrowLeft } from 'lucide-react';
 
 const SAMPLE_EVENTS = [
   { id: 'e1', title: 'Coastline Reforestation', date: 'Feb 28', location: 'Sunset Cove' },
@@ -42,12 +42,17 @@ export default function VolunteerDashboard({ setCurrentPage, setSelectedEvent })
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8 pt-24">
+    <div className="min-h-full bg-slate-50 p-8 pt-24">
       <div className="max-w-6xl mx-auto">
         <header className="mb-6 flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-black">Welcome back, Sajjad! 👋</h1>
-            <p className="text-slate-500 font-medium">You're {Math.max(0, 10 - hours % 10)} hours away from your next milestone badge.</p>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setCurrentPage?.('home')} className="bg-white/20 backdrop-blur-md p-2 rounded-full text-slate-700 hover:bg-white/40">
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black">Welcome back, Sajjad! 👋</h1>
+              <p className="text-slate-500 font-medium">You're {Math.max(0, 10 - hours % 10)} hours away from your next milestone badge.</p>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-500">Notifications</p>

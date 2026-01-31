@@ -7,7 +7,7 @@ const SAMPLE_EVENTS = [
   { id: 'e3', title: 'Beach Cleanup', category: 'Environment', date: 'Feb 21, 2026', location: 'North Beach', summary: 'Collect debris and sort recyclables.', details: 'Bring sun protection and reusable gloves.' },
 ];
 
-export default function EventPage({ selectedEventId, setSelectedEvent }) {
+export default function EventPage({ selectedEventId, setSelectedEvent, setCurrentPage }) {
   const [events] = useState(SAMPLE_EVENTS);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
@@ -52,7 +52,7 @@ export default function EventPage({ selectedEventId, setSelectedEvent }) {
   const categories = ['All', ...Array.from(new Set(events.map((e) => e.category)))];
 
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-full bg-white pb-20">
       {/* Event Header Image */}
       <div className="h-[300px] w-full relative">
         <img
@@ -61,7 +61,7 @@ export default function EventPage({ selectedEventId, setSelectedEvent }) {
           alt="Environmental Volunteering"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <button className="absolute top-6 left-6 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40">
+        <button onClick={() => { setCurrentPage?.('home'); setSelectedEvent?.(null); }} className="absolute top-6 left-6 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40">
           <ArrowLeft size={20} />
         </button>
       </div>
