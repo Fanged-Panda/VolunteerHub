@@ -1,68 +1,132 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users, Info, ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react';
-export default function EventPage() {
+
+const SAMPLE_EVENTS = [
+  { id: 'e1', title: 'Coastline Reforestation', category: 'Environment', date: 'Feb 28, 2026', location: 'Sunset Cove', summary: 'Plant native mangroves to prevent erosion.', details: 'Bring water and gloves. Tools provided.' },
+  { id: 'e2', title: 'Community Garden Build', category: 'Community', date: 'Mar 5, 2026', location: 'Downtown', summary: 'Create raised beds and plant seedlings.', details: 'No experience required.' },
+  { id: 'e3', title: 'Beach Cleanup', category: 'Environment', date: 'Feb 21, 2026', location: 'North Beach', summary: 'Collect debris and sort recyclables.', details: 'Bring sun protection and reusable gloves.' },
+];
+
+export default function EventPage({ selectedEventId, setSelectedEvent }) {
+  const [events] = useState(SAMPLE_EVENTS);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('All');
+  const [filtered, setFiltered] = useState(events);
+  const [selected, setSelected] = useState(events[0]);
+  const [appliedIds, setAppliedIds] = useState(new Set());
+
+  useEffect(() => {
+    const raw = localStorage.getItem('appliedEvents');
+    try {
+      const parsed = raw ? JSON.parse(raw) : [];
+      setAppliedIds(new Set(parsed));
+    } catch (e) {
+      setAppliedIds(new Set());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedEventId) {
+      const found = events.find((ev) => ev.id === selectedEventId);
+      if (found) setSelected(found);
+    }
+  }, [selectedEventId, events]);
+
+  useEffect(() => {
+    const q = query.toLowerCase().trim();
+    setFiltered(events.filter((ev) => {
+      const matchQ = q === '' || ev.title.toLowerCase().includes(q) || ev.summary.toLowerCase().includes(q);
+      const matchCat = category === 'All' || ev.category === category;
+      return matchQ && matchCat;
+    }));
+  }, [query, category, events]);
+
+  function toggleApply(id) {
+    const setCopy = new Set(appliedIds);
+    if (setCopy.has(id)) setCopy.delete(id);
+    else setCopy.add(id);
+    setAppliedIds(setCopy);
+    localStorage.setItem('appliedEvents', JSON.stringify(Array.from(setCopy)));
+  }
+
+  const categories = ['All', ...Array.from(new Set(events.map((e) => e.category)))];
+
   return (
     <div className="min-h-screen bg-white pb-20">
       {/* Event Header Image */}
-      <div className="h-[400px] w-full relative">
-        <img 
-          src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=2000" 
+      <div className="h-[300px] w-full relative">
+        <img
+          src="https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=2000"
           className="w-full h-full object-cover"
           alt="Environmental Volunteering"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <button className="absolute top-10 left-10 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40">
-          <ArrowLeft size={24} />
+        <button className="absolute top-6 left-6 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40">
+          <ArrowLeft size={20} />
         </button>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 -mt-20 relative z-10">
-        <div className="bg-white rounded-[3rem] shadow-2xl p-10 grid lg:grid-cols-3 gap-12">
-          
-          {/* Main Info */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Environment</span>
-              <span className="text-slate-400 text-sm">• 4.8 Rating</span>
+      <div className="max-w-7xl mx-auto px-6 -mt-20 relative z-10">
+        <div className="bg-white rounded-[1.5rem] shadow-2xl p-6 grid lg:grid-cols-3 gap-6">
+          {/* List / Filters */}
+          <div className="lg:col-span-1 p-4 border-r hidden lg:block">
+            <div className="mb-4">
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events" className="w-full border border-slate-200 p-2 rounded-lg" />
             </div>
-            <h1 className="text-5xl font-black mb-6">Coastline Reforestation Project</h1>
-            <p className="text-lg text-slate-600 leading-relaxed mb-8">
-              Join us for a day of planting native mangroves along the coastline. This project helps prevent erosion and restores natural habitats for local wildlife. No experience needed—we provide all the tools!
-            </p>
-            
-            <div className="flex gap-10 border-t border-slate-100 pt-8">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Impact</p>
-                <p className="font-bold">500 Trees Target</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase mb-1">Volunteers</p>
-                <p className="font-bold">24 / 40 Joined</p>
-              </div>
+            <div className="mb-4">
+              <label className="text-sm font-bold text-slate-500">Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full mt-2 border border-slate-200 p-2 rounded-lg">
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="space-y-3 overflow-auto max-h-[420px]">
+              {filtered.map((ev) => (
+                <button key={ev.id} onClick={() => { setSelected(ev); setSelectedEvent?.(ev.id); }} className="w-full text-left p-3 rounded-lg hover:bg-slate-50 transition flex items-start gap-3">
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-bold">{ev.title}</h4>
+                      <span className="text-sm text-slate-400">{ev.date}</span>
+                    </div>
+                    <p className="text-sm text-slate-500">{ev.summary}</p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Sidebar Action Card */}
-          <div className="bg-slate-50 p-8 rounded-[2rem] h-fit border border-slate-100">
-            <h3 className="font-bold text-xl mb-4 text-center">Ready to help?</h3>
-            <div className="space-y-4 mb-8">
-              <div className="flex items-start gap-3">
-                <Calendar className="text-orange-500 mt-1" size={20} />
-                <p className="text-sm"><strong>Feb 28, 2026</strong><br/>08:30 AM - 12:30 PM</p>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="text-orange-500 mt-1" size={20} />
-                <p className="text-sm"><strong>Sunset Cove</strong><br/>Pacific Highway, CA</p>
-              </div>
-            </div>
-            <button className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-orange-100 hover:bg-orange-600 transition-all mb-4">
-              Join This Event
-            </button>
-            <button className="w-full flex items-center justify-center gap-2 font-bold text-slate-500 hover:text-slate-900 transition-colors">
-              <Share2 size={18} /> Share Event
-            </button>
-          </div>
+          {/* Details */}
+          <div className="lg:col-span-2 p-6">
+            {selected && (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase">{selected.category}</span>
+                  <span className="text-slate-400 text-sm">• {selected.date} • {selected.location}</span>
+                </div>
+                <h1 className="text-3xl font-black mb-4">{selected.title}</h1>
+                <p className="text-slate-600 mb-6">{selected.details}</p>
 
+                <div className="flex gap-4 items-center">
+                  <button onClick={() => toggleApply(selected.id)} className={`px-6 py-3 rounded-2xl font-bold ${appliedIds.has(selected.id) ? 'bg-slate-900 text-white' : 'bg-orange-500 text-white'}`}>
+                    {appliedIds.has(selected.id) ? 'Withdraw Application' : 'Apply to This Event'}
+                  </button>
+                  <button className="px-4 py-2 border border-slate-200 rounded-full flex items-center gap-2">
+                    <Share2 size={16} /> Share
+                  </button>
+                </div>
+
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase">Volunteers</p>
+                    <p className="font-bold">24 / 40 Joined</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <p className="text-xs font-bold text-slate-400 uppercase">Impact</p>
+                    <p className="font-bold">500 Trees Target</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
