@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Users, Info, ArrowLeft, Share2, Calendar, MapPin } from 'lucide-react';
 
-const SAMPLE_EVENTS = [
-  { id: 1, title: 'CP Workshop: Graph Theory', category: 'Workshop', date: 'Feb 10, 2026', location: 'Central Lab', summary: 'Master complex algorithms with top competitive programmers.', details: 'Bring a laptop. Hands-on sessions with problem sets.' },
-  { id: 2, title: 'Robotics 101: Arduino', category: 'Workshop', date: 'Feb 15, 2026', location: 'WRE Workshop', summary: 'Basics of hardware integration and sensor control.', details: 'Tools and boards provided; limited seats.' },
-  { id: 3, title: 'Basanta Utsav Rehearsal', category: 'Cultural', date: 'Feb 20, 2026', location: 'Gol Chattar', summary: 'Cultural rehearsal and preparation for spring festival.', details: 'Open to performers and helpers; costume briefing included.' },
-  { id: 4, title: 'IEEE Seminar: AI in Power', category: 'Seminar', date: 'Feb 25, 2026', location: 'ECE Seminar Hall', summary: 'Exploring AI applications in modern power grids.', details: 'Includes guest speakers from industry and research.' },
-];
+// const SAMPLE_EVENTS = [
+//   { id: 1, title: 'CP Workshop: Graph Theory', category: 'Workshop', date: 'Feb 10, 2026', location: 'Central Lab', summary: 'Master complex algorithms with top competitive programmers.', details: 'Bring a laptop. Hands-on sessions with problem sets.' },
+//   { id: 2, title: 'Robotics 101: Arduino', category: 'Workshop', date: 'Feb 15, 2026', location: 'WRE Workshop', summary: 'Basics of hardware integration and sensor control.', details: 'Tools and boards provided; limited seats.' },
+//   { id: 3, title: 'Basanta Utsav Rehearsal', category: 'Cultural', date: 'Feb 20, 2026', location: 'Gol Chattar', summary: 'Cultural rehearsal and preparation for spring festival.', details: 'Open to performers and helpers; costume briefing included.' },
+//   { id: 4, title: 'IEEE Seminar: AI in Power', category: 'Seminar', date: 'Feb 25, 2026', location: 'ECE Seminar Hall', summary: 'Exploring AI applications in modern power grids.', details: 'Includes guest speakers from industry and research.' },
+// ];
 
 export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}, selectedEventId, setSelectedEvent, setCurrentPage }) {
   const [query, setQuery] = useState('');
@@ -232,10 +232,10 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
                     <p className="text-xs font-bold text-slate-400 uppercase">Volunteers</p>
                     <p className="font-bold">{(eventCounts && eventCounts[selected.id]) ? eventCounts[selected.id] : 0} / {selected.capacity || 40} Joined</p>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  {/* <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <p className="text-xs font-bold text-slate-400 uppercase">Impact</p>
                     <p className="font-bold">500 Trees Target</p>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             )}

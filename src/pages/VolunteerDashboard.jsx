@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, Award, MapPin, ArrowLeft } from 'lucide-react';
 
 const SAMPLE_EVENTS = [
-  { id: 'e1', title: 'Coastline Reforestation', date: 'Feb 28', location: 'Sunset Cove' },
-  { id: 'e2', title: 'Community Garden Build', date: 'Mar 5', location: 'Downtown' },
-  { id: 'e3', title: 'Beach Cleanup', date: 'Feb 21', location: 'North Beach' },
+  // { id: 'e1', title: 'Coastline Reforestation', date: 'Feb 28', location: 'Sunset Cove' },
+  // { id: 'e2', title: 'Community Garden Build', date: 'Mar 5', location: 'Downtown' },
+  // { id: 'e3', title: 'Beach Cleanup', date: 'Feb 21', location: 'North Beach' },
 ];
 
 export default function VolunteerDashboard({ setCurrentPage, setSelectedEvent }) {

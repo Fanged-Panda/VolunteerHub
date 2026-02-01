@@ -14,8 +14,8 @@ export default function App({ events = [], setEvents, setCurrentPage, setSelecte
           <span className="text-xl font-bold tracking-tighter uppercase">VolunteerHub</span>
         </div>
         <div className="hidden md:flex gap-8 font-medium items-center">
-          <a href="#" className="hover:text-orange-500 transition">Causes</a>
-          <a href="#" className="hover:text-orange-500 transition">For Nonprofits</a>
+          {/* <a href="#" className="hover:text-orange-500 transition">Causes</a>
+          <a href="#" className="hover:text-orange-500 transition">For Nonprofits</a> */}
           <button onClick={() => setAuthMode('register')} className="px-4 py-2 rounded-full font-semibold hover:text-orange-500 transition">Register</button>
           <button onClick={() => setAuthMode('login')} className="bg-orange-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-orange-600 transition">Login</button>
 
@@ -90,7 +90,7 @@ export default function App({ events = [], setEvents, setCurrentPage, setSelecte
           <span className="text-3xl font-bold italic">Cuet Computer Club</span>
           <span className="text-3xl font-bold italic">ASRRO</span>
           <span className="text-3xl font-bold italic">IEEE</span>
-          <span className="text-3xl font-bold italic">Joydhoni</span>
+          <span className="text-3xl font-bold italic">Joyodhoni</span>
         </div>
       </section>
 

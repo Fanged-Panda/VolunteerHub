@@ -31,7 +31,7 @@ export default function App() {
       {/* Navigation */}
       <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex gap-4 bg-black/80 backdrop-blur-md p-2 rounded-full z-[100]">
         <button onClick={() => setCurrentPage('home')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'home' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Home</button>
-        <button onClick={() => setCurrentPage('dashboard')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'dashboard' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Dash</button>
+        <button onClick={() => setCurrentPage('dashboard')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'dashboard' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Dashboard</button>
         <button onClick={() => setCurrentPage('event')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'event' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Event</button>
       </div>
 
