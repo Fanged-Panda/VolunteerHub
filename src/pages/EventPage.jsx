@@ -17,7 +17,7 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [addForm, setAddForm] = useState({ title: '', date: '', location: '', club: '', category: '', summary: '', details: '' });
+  const [addForm, setAddForm] = useState({ title: '', date: '', location: '', club: '', details: '' });
 
   useEffect(() => {
     const raw = localStorage.getItem('appliedEvents');
@@ -45,6 +45,16 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
       return matchQ && matchClub;
     }));
   }, [query, club, events]);
+
+  // prevent background scroll when add form modal is open
+  useEffect(() => {
+    if (showAddForm) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [showAddForm]);
 
   function toggleApply(id) {
     const setCopy = new Set(appliedIds);
@@ -181,53 +191,7 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
                   </div>
                 )}
 
-                {/* Add Event Form (shows when triggered) */}
-                {showAddForm && (
-                  <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
-                    <h3 className="font-bold mb-3">Add New Event</h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <label className="text-sm font-medium">Title</label>
-                      <input placeholder="Title" className="p-2 border" value={addForm.title} onChange={(e) => setAddForm({ ...addForm, title: e.target.value })} />
-
-                      <label className="text-sm font-medium">Date</label>
-                      <input placeholder="Date" className="p-2 border" value={addForm.date} onChange={(e) => setAddForm({ ...addForm, date: e.target.value })} />
-
-                      <label className="text-sm font-medium">Location</label>
-                      <input placeholder="Location" className="p-2 border" value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} />
-
-                      <label className="text-sm font-medium">Club</label>
-                      <input placeholder="Club" className="p-2 border" value={addForm.club} onChange={(e) => setAddForm({ ...addForm, club: e.target.value })} />
-
-                      <label className="text-sm font-medium">Category</label>
-                      <input placeholder="Category" className="p-2 border" value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} />
-
-                      <label className="text-sm font-medium">Details</label>
-                      <textarea placeholder="Details" className="p-2 border" value={addForm.details} onChange={(e) => setAddForm({ ...addForm, details: e.target.value })} />
-
-                      <div className="flex gap-2">
-                        <button onClick={() => {
-                          const newId = Date.now();
-                          const newEvent = {
-                            id: newId,
-                            title: addForm.title || 'Untitled',
-                            date: addForm.date || '',
-                            location: addForm.location || '',
-                            club: addForm.club || 'Unspecified',
-                            category: addForm.category || 'Other',
-                            summary: '',
-                            details: addForm.details || ''
-                          };
-                          setEvents((prev) => [newEvent, ...prev]);
-                          setSelected(newEvent);
-                          setSelectedEvent?.(newEvent.id);
-                          setShowAddForm(false);
-                          setAddForm({ title: '', date: '', location: '', club: '', category: '', summary: '', details: '' });
-                        }} className="px-3 py-2 bg-orange-500 text-white rounded">Save</button>
-                        <button onClick={() => setShowAddForm(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* (removed inline add form; modal version renders at root when active) */}
 
                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -243,7 +207,57 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
             )}
           </div>
         </div>
-      </div>
+        </div>
+
+        {/* Add Event Modal (overlays entire page) */}
+        {showAddForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold">Add New Event</h3>
+                <button onClick={() => setShowAddForm(false)} className="text-slate-400">✕</button>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <label className="text-sm font-medium">Title</label>
+                <input placeholder="Title" className="p-2 border" value={addForm.title} onChange={(e) => setAddForm({ ...addForm, title: e.target.value })} />
+
+                <label className="text-sm font-medium">Date</label>
+                <input placeholder="Date" className="p-2 border" value={addForm.date} onChange={(e) => setAddForm({ ...addForm, date: e.target.value })} />
+
+                <label className="text-sm font-medium">Location</label>
+                <input placeholder="Location" className="p-2 border" value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} />
+
+                <label className="text-sm font-medium">Club</label>
+                <input placeholder="Club" className="p-2 border" value={addForm.club} onChange={(e) => setAddForm({ ...addForm, club: e.target.value })} />
+
+                <label className="text-sm font-medium">Details</label>
+                <textarea placeholder="Details" className="p-2 border" value={addForm.details} onChange={(e) => setAddForm({ ...addForm, details: e.target.value })} />
+
+                <div className="flex justify-end gap-2 mt-2">
+                  <button onClick={() => setShowAddForm(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                  <button onClick={() => {
+                    const newId = Date.now();
+                    const newEvent = {
+                      id: newId,
+                      title: addForm.title || 'Untitled',
+                      date: addForm.date || '',
+                      location: addForm.location || '',
+                      club: addForm.club || 'Unspecified',
+                      category: 'Other',
+                      summary: '',
+                      details: addForm.details || ''
+                    };
+                    setEvents((prev) => [newEvent, ...prev]);
+                    setSelected(newEvent);
+                    setSelectedEvent?.(newEvent.id);
+                    setShowAddForm(false);
+                    setAddForm({ title: '', date: '', location: '', club: '', details: '' });
+                  }} className="px-4 py-2 bg-orange-500 text-white rounded">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
