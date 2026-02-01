@@ -14,6 +14,16 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
   const [filtered, setFiltered] = useState(events);
   const [selected, setSelected] = useState(events[0] || null);
   const [appliedIds, setAppliedIds] = useState(new Set());
+  const [eventCounts, setEventCounts] = useState(() => {
+    try {
+      const raw = localStorage.getItem('eventCounts');
+      if (raw) return JSON.parse(raw);
+      const defaults = Object.fromEntries(events.map((e) => [e.id, 24]));
+      return defaults;
+    } catch (e) {
+      return Object.fromEntries(events.map((e) => [e.id, 24]));
+    }
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -46,6 +56,21 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
     }));
   }, [query, club, events]);
 
+  // ensure eventCounts has entries for new events
+  useEffect(() => {
+    setEventCounts((prev) => {
+      const copy = { ...(prev || {}) };
+      let changed = false;
+      events.forEach((e) => {
+        if (copy[e.id] === undefined) { copy[e.id] = 24; changed = true; }
+      });
+      if (changed) {
+        try { localStorage.setItem('eventCounts', JSON.stringify(copy)); } catch (e) {}
+      }
+      return copy;
+    });
+  }, [events]);
+
   // prevent background scroll when add form modal is open
   useEffect(() => {
     if (showAddForm) {
@@ -62,6 +87,15 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
     else setCopy.add(id);
     setAppliedIds(setCopy);
     localStorage.setItem('appliedEvents', JSON.stringify(Array.from(setCopy)));
+    // update eventCounts: increment when applied, decrement when withdrawn
+    setEventCounts((prev) => {
+      const copy = { ...(prev || {}) };
+      const before = Number(copy[id] || 0);
+      const after = setCopy.has(id) ? before + 1 : Math.max(0, before - 1);
+      copy[id] = after;
+      try { localStorage.setItem('eventCounts', JSON.stringify(copy)); } catch (e) {}
+      return copy;
+    });
   }
 
   function startEdit(ev) {
@@ -196,7 +230,7 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <p className="text-xs font-bold text-slate-400 uppercase">Volunteers</p>
-                    <p className="font-bold">24 / 40 Joined</p>
+                    <p className="font-bold">{(eventCounts && eventCounts[selected.id]) ? eventCounts[selected.id] : 0} / {selected.capacity || 40} Joined</p>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <p className="text-xs font-bold text-slate-400 uppercase">Impact</p>
