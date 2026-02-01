@@ -10,12 +10,14 @@ const SAMPLE_EVENTS = [
 
 export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}, selectedEventId, setSelectedEvent, setCurrentPage }) {
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('All');
+  const [club, setClub] = useState('All');
   const [filtered, setFiltered] = useState(events);
   const [selected, setSelected] = useState(events[0] || null);
   const [appliedIds, setAppliedIds] = useState(new Set());
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ title: '', date: '', location: '', club: '', category: '', summary: '', details: '' });
 
   useEffect(() => {
     const raw = localStorage.getItem('appliedEvents');
@@ -38,11 +40,11 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
   useEffect(() => {
     const q = query.toLowerCase().trim();
     setFiltered(events.filter((ev) => {
-      const matchQ = q === '' || ev.title.toLowerCase().includes(q) || ev.summary.toLowerCase().includes(q);
-      const matchCat = category === 'All' || ev.category === category;
-      return matchQ && matchCat;
+      const matchQ = q === '' || ev.title.toLowerCase().includes(q) || (ev.summary || '').toLowerCase().includes(q);
+      const matchClub = club === 'All' || (ev.club || 'Unspecified') === club;
+      return matchQ && matchClub;
     }));
-  }, [query, category, events]);
+  }, [query, club, events]);
 
   function toggleApply(id) {
     const setCopy = new Set(appliedIds);
@@ -53,6 +55,13 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
   }
 
   function startEdit(ev) {
+    // If already editing the same event, toggle off
+    if (isEditing && editForm && editForm.id === ev.id) {
+      setIsEditing(false);
+      setEditForm(null);
+      return;
+    }
+    setShowAddForm(false);
     setEditForm({ ...ev });
     setIsEditing(true);
   }
@@ -69,7 +78,7 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
     setEditForm(null);
   }
 
-  const categories = ['All', ...Array.from(new Set(events.map((e) => e.category)))];
+  const clubs = ['All', ...Array.from(new Set(events.map((e) => e.club || 'Unspecified')))];
 
   return (
     <div className="min-h-full bg-white pb-20">
@@ -94,10 +103,13 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events" className="w-full border border-slate-200 p-2 rounded-lg" />
             </div>
             <div className="mb-4">
-              <label className="text-sm font-bold text-slate-500">Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full mt-2 border border-slate-200 p-2 rounded-lg">
-                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              <label className="text-sm font-bold text-slate-500">Club</label>
+              <select value={club} onChange={(e) => setClub(e.target.value)} className="w-full mt-2 border border-slate-200 p-2 rounded-lg">
+                {clubs.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
+            </div>
+            <div className="mb-4">
+              <button onClick={() => { setShowAddForm(true); setAddForm({ title: '', date: '', location: '', club: '', category: '', summary: '', details: '' }); }} className="w-full px-3 py-2 bg-orange-500 text-white rounded-lg font-bold">Add Event</button>
             </div>
             <div className="space-y-3 overflow-auto max-h-[420px]">
               {filtered.map((ev) => (
@@ -119,15 +131,16 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
             {selected && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase">{selected.category}</span>
+                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold uppercase">{selected.club || selected.category}</span>
                   <span className="text-slate-400 text-sm">• {selected.date} • {selected.location}</span>
+                  {/* <button onClick={() => { setShowAddForm(true); setAddForm({ title: '', date: '', location: '', club: '', category: '', summary: '', details: '' }); setIsEditing(false); }} className="ml-auto px-3 py-1 bg-orange-500 text-white rounded-full text-sm">Add Event</button> */}
                 </div>
                 <h1 className="text-3xl font-black mb-4">{selected.title}</h1>
                 <p className="text-slate-600 mb-6">{selected.details}</p>
 
                 <div className="flex gap-3 mb-4">
                   <button onClick={() => startEdit(selected)} className="px-3 py-2 bg-white border rounded">Edit Event</button>
-                  <button onClick={() => { setCurrentPage?.('home'); setSelectedEvent?.(null); }} className="px-3 py-2 bg-white border rounded">Back to Home</button>
+                  {/* <button onClick={() => { setCurrentPage?.('home'); setSelectedEvent?.(null); }} className="px-3 py-2 bg-white border rounded">Back to Home</button> */}
                 </div>
 
                 <div className="flex gap-4 items-center">
@@ -143,14 +156,74 @@ export default function EventPage({ events = SAMPLE_EVENTS, setEvents = () => {}
                   <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
                     <h3 className="font-bold mb-3">Edit Event</h3>
                     <div className="grid grid-cols-1 gap-3">
-                      <input className="p-2 border" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-                      <input className="p-2 border" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
-                      <input className="p-2 border" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
-                      <input className="p-2 border" value={editForm.summary} onChange={(e) => setEditForm({ ...editForm, summary: e.target.value })} />
-                      <textarea className="p-2 border" value={editForm.details} onChange={(e) => setEditForm({ ...editForm, details: e.target.value })} />
+                      <label className="text-sm font-medium">Title</label>
+                      <input placeholder="Title" className="p-2 border" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+
+                      <label className="text-sm font-medium">Date</label>
+                      <input placeholder="Date" className="p-2 border" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+
+                      <label className="text-sm font-medium">Location</label>
+                      <input placeholder="Location" className="p-2 border" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
+
+                      <label className="text-sm font-medium">Club</label>
+                      <input placeholder="Club" className="p-2 border" value={editForm.club || ''} onChange={(e) => setEditForm({ ...editForm, club: e.target.value })} />
+
+
+
+                      <label className="text-sm font-medium">Details</label>
+                      <textarea placeholder="Details" className="p-2 border" value={editForm.details} onChange={(e) => setEditForm({ ...editForm, details: e.target.value })} />
+
                       <div className="flex gap-2">
                         <button onClick={saveEdit} className="px-3 py-2 bg-orange-500 text-white rounded">Save</button>
                         <button onClick={cancelEdit} className="px-3 py-2 bg-white border rounded">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Event Form (shows when triggered) */}
+                {showAddForm && (
+                  <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                    <h3 className="font-bold mb-3">Add New Event</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      <label className="text-sm font-medium">Title</label>
+                      <input placeholder="Title" className="p-2 border" value={addForm.title} onChange={(e) => setAddForm({ ...addForm, title: e.target.value })} />
+
+                      <label className="text-sm font-medium">Date</label>
+                      <input placeholder="Date" className="p-2 border" value={addForm.date} onChange={(e) => setAddForm({ ...addForm, date: e.target.value })} />
+
+                      <label className="text-sm font-medium">Location</label>
+                      <input placeholder="Location" className="p-2 border" value={addForm.location} onChange={(e) => setAddForm({ ...addForm, location: e.target.value })} />
+
+                      <label className="text-sm font-medium">Club</label>
+                      <input placeholder="Club" className="p-2 border" value={addForm.club} onChange={(e) => setAddForm({ ...addForm, club: e.target.value })} />
+
+                      <label className="text-sm font-medium">Category</label>
+                      <input placeholder="Category" className="p-2 border" value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} />
+
+                      <label className="text-sm font-medium">Details</label>
+                      <textarea placeholder="Details" className="p-2 border" value={addForm.details} onChange={(e) => setAddForm({ ...addForm, details: e.target.value })} />
+
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          const newId = Date.now();
+                          const newEvent = {
+                            id: newId,
+                            title: addForm.title || 'Untitled',
+                            date: addForm.date || '',
+                            location: addForm.location || '',
+                            club: addForm.club || 'Unspecified',
+                            category: addForm.category || 'Other',
+                            summary: '',
+                            details: addForm.details || ''
+                          };
+                          setEvents((prev) => [newEvent, ...prev]);
+                          setSelected(newEvent);
+                          setSelectedEvent?.(newEvent.id);
+                          setShowAddForm(false);
+                          setAddForm({ title: '', date: '', location: '', club: '', category: '', summary: '', details: '' });
+                        }} className="px-3 py-2 bg-orange-500 text-white rounded">Save</button>
+                        <button onClick={() => setShowAddForm(false)} className="px-3 py-2 bg-white border rounded">Cancel</button>
                       </div>
                     </div>
                   </div>

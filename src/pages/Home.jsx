@@ -33,7 +33,7 @@ export default function App({ events = [], setEvents, setCurrentPage, setSelecte
             Find local causes that match your skills. Join thousands making a real-world impact every single day.
           </p>
           <div className="flex gap-4">
-            <button onClick={() => { setSelectedEvent?.(null); setCurrentPage?.('event'); }} className="bg-orange-500 text-white px-10 py-4 rounded-2xl text-lg font-bold shadow-xl shadow-orange-100 hover:scale-105 transition-all">Find Opportunities</button>
+            <button onClick={() => { setSelectedEvent?.(null); setCurrentPage?.('event'); }} className="bg-orange-500 text-white px-10 py-4 rounded-2xl text-lg font-bold shadow-xl shadow-orange-100 hover:scale-105 transition-all">Are you a Volunteer?</button>
             <button className="border-2 border-slate-200 px-10 py-4 rounded-2xl text-lg font-bold hover:bg-slate-50 transition-all">Learn More</button>
           </div>
         </div>
