@@ -1,87 +1,143 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import cuetEgg from '../assets/cuet with egg.jpeg';
+import rasel from '../assets/rasel.jpg';
+import tsc from '../assets/tsc.jpg';
+import asrro from '../assets/asrro.jpg';
+import work from '../assets/work.jpg';
 
-export default function App({ events = [], setEvents, setCurrentPage, setSelectedEvent }) {
-  const [authMode, setAuthMode] = useState(null); // 'login' | 'register' | null
+export default function Home({ events = [], setSelectedEvent, openEvents }) {
+  const [activeSlide, setActiveSlide] = useState(0);
 
-  const upcoming = events.slice(0, 4);
+  const slides = useMemo(
+    () => [
+      { src: cuetEgg, alt: 'CUET iconic building', label: 'CUET with Egg' },
+      { src: rasel, alt: 'Rasel', label: 'Rasel Hall' },
+      { src: tsc, alt: 'TSC cafeteria', label: 'TSC Cafeteria' },
+      { src: asrro, alt: 'ASRRO', label: 'ASRRO' },
+      { src: work, alt: 'ASRRO', label: 'Workshop' },
+    ],
+    [],
+  );
+
+  const upcoming = useMemo(() => events.slice(0, 4), [events]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % slides.length);
+    }, 3500);
+
+    return () => window.clearInterval(timer);
+  }, [slides.length]);
+
+  function goPrev() {
+    setActiveSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  }
+
+  function goNext() {
+    setActiveSlide((prev) => (prev + 1) % slides.length);
+  }
 
   return (
-    <div className="min-h-full bg-white text-slate-900 font-sans selection:bg-orange-100">
-      {/* Navbar */}
-      <nav className="h-16 flex items-center justify-between px-10 sticky top-0 bg-white/80 backdrop-blur-md z-50">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-orange-500 rounded-lg shadow-lg shadow-orange-200" />
-          <span className="text-xl font-bold tracking-tighter uppercase">VolunteerHub</span>
-        </div>
-        <div className="hidden md:flex gap-8 font-medium items-center">
-          {/* <a href="#" className="hover:text-orange-500 transition">Causes</a>
-          <a href="#" className="hover:text-orange-500 transition">For Nonprofits</a> */}
-          <button onClick={() => setAuthMode('register')} className="px-4 py-2 rounded-full font-semibold hover:text-orange-500 transition">Register</button>
-          <button onClick={() => setAuthMode('login')} className="bg-orange-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-orange-600 transition">Login</button>
-
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <header className="h-[calc(100vh-4rem)] w-full max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 px-10 items-center overflow-visible">
-            <div>
-          <span className="text-orange-600 font-bold tracking-widest text-sm uppercase">The World is Waiting</span>
-          <h1 className="text-7xl font-black leading-[1.1] mt-4 mb-8">
-            Volunteering <br /><span className="text-orange-500">Simplified.</span>
-          </h1>
-          <p className="text-xl text-slate-500 leading-relaxed max-w-lg mb-10">
-            Find local causes that match your skills. Join thousands making a real-world impact every single day.
+    <main>
+      <section className="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
+        <div>
+          <p className="mb-4 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-800">
+            Official CUET Club Events
           </p>
-          <div className="flex gap-4">
-            <button onClick={() => { setSelectedEvent?.(null); setCurrentPage?.('event'); }} className="bg-orange-500 text-white px-10 py-4 rounded-2xl text-lg font-bold shadow-xl shadow-orange-100 hover:scale-105 transition-all">Are you a Volunteer?</button>
-            <button className="border-2 border-slate-200 px-10 py-4 rounded-2xl text-lg font-bold hover:bg-slate-50 transition-all">Learn More</button>
+          <h1 className="text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
+            Volunteer for CUET Clubs,
+            <span className="block text-orange-500">One Event at a Time</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+            Discover CUET-only events, apply quickly, track tasks, and contribute to your campus community with a modern volunteer workflow.
+          </p>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button
+              onClick={() => openEvents()}
+              className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600"
+            >
+              Explore Events
+            </button>
           </div>
         </div>
-        <div className="relative h-full flex items-center justify-center">
-          <img
-            src="https://plus.unsplash.com/premium_photo-1678132566297-0c5255de1de1?q=80&w=2000&auto=format&fit=crop"
-            className="max-h-[80%] w-auto rounded-[2rem] shadow-2xl drop-shadow-2xl border-8 border-white transform rotate-2 hover:rotate-0 transition-all duration-500 object-cover"
-            alt="Volunteer in orange vest"
-          />
-        </div>
-      </header>
 
+        <div className="relative overflow-hidden rounded-3xl shadow-2xl">
+          {slides.map((slide, index) => (
+            <img
+              key={slide.label}
+              src={slide.src}
+              alt={slide.alt}
+              className={`absolute left-0 top-0 h-[420px] w-full object-cover transition-opacity duration-700 ${
+                index === activeSlide ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          ))}
 
-{/* Upcoming events preview */}
-<section className="max-w-6xl mx-auto px-10 pb-20 mt-12 md:mt-16 lg:mt-24">
-  <h2 className="text-2xl font-bold mb-6">Upcoming Events</h2>
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {upcoming.map((e) => (
-      <div key={e.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between h-full">
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-[10px] text-orange-600 font-black uppercase tracking-widest mb-1">{e.club}</p>
-              <p className="text-sm text-slate-400 uppercase font-bold">{e.date}</p>
-              <h3 className="font-bold text-lg">{e.title}</h3>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+          <div className="relative flex h-[420px] items-end justify-between p-4">
+            <div className="rounded-full bg-black/50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+              {slides[activeSlide].label}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goPrev}
+                className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
+                aria-label="Previous image"
+              >
+                Prev
+              </button>
+              <button
+                onClick={goNext}
+                className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
+                aria-label="Next image"
+              >
+                Next
+              </button>
             </div>
           </div>
-          <p className="text-sm text-slate-500 mb-4">{e.summary || e.desc || `Join ${e.club} for ${e.title} at ${e.location}.`}</p>
+
+          <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2">
+            {slides.map((slide, index) => (
+              <button
+                key={slide.label + '-dot'}
+                onClick={() => setActiveSlide(index)}
+                className={`h-2.5 rounded-full transition-all ${index === activeSlide ? 'w-7 bg-orange-500' : 'w-2.5 bg-white/80'}`}
+                aria-label={`Go to ${slide.label}`}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-2xl font-black text-slate-900">Upcoming Events</h2>
+          <button onClick={() => openEvents()} className="text-sm font-bold text-orange-600 hover:text-orange-700">View all</button>
         </div>
 
-        <div className="flex gap-3 mt-auto">
-          <button 
-            onClick={() => { setSelectedEvent?.(e.id); setCurrentPage?.('event'); }} 
-            className="px-4 py-2 bg-white border border-slate-200 rounded-full text-sm font-bold hover:bg-slate-900 hover:text-white transition"
-          >
-            Details
-          </button>
-          <button 
-            onClick={() => { setSelectedEvent?.(e.id); setCurrentPage?.('event'); }} 
-            className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm font-bold hover:bg-orange-600 transition"
-          >
-            Join
-          </button>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {upcoming.map((event) => (
+            <article key={event.id} className="flex h-full flex-col rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">{event.club}</p>
+              <h3 className="mt-2 text-lg font-black text-slate-900">{event.title}</h3>
+              <p className="mt-1 text-sm text-slate-600">{event.date} • {event.location}</p>
+              <p className="mt-4 flex-1 text-sm leading-relaxed text-slate-600">{event.summary}</p>
+              <button
+                className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                onClick={() => {
+                  setSelectedEvent(event.id);
+                  openEvents(event.id);
+                }}
+              >
+                Details & Apply
+              </button>
+            </article>
+          ))}
         </div>
-      </div>
-    ))}
-  </div>
-</section>
+      </section>
 
       {/* Trusted Clubs */}
       <section className="bg-slate-50 py-20 px-10 text-center">
@@ -93,26 +149,6 @@ export default function App({ events = [], setEvents, setCurrentPage, setSelecte
           <span className="text-3xl font-bold italic">Joyodhoni</span>
         </div>
       </section>
-
-      {/* Auth modal (simple) */}
-      {authMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">{authMode === 'login' ? 'Login' : 'Create account'}</h3>
-              <button onClick={() => setAuthMode(null)} className="text-slate-400">✕</button>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); setAuthMode(null); }} className="space-y-4">
-              <input required placeholder="Email" type="email" className="w-full border border-slate-200 p-3 rounded-lg" />
-              <input required placeholder="Password" type="password" className="w-full border border-slate-200 p-3 rounded-lg" />
-              {authMode === 'register' && <input placeholder="Full name" className="w-full border border-slate-200 p-3 rounded-lg" />}
-              <div className="flex justify-end">
-                <button type="submit" className="px-6 py-2 bg-orange-500 text-white rounded-full font-bold">{authMode === 'login' ? 'Login' : 'Register'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+    </main>
   );
 }

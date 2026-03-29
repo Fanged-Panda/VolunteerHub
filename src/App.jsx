@@ -2,6 +2,10 @@ import React, { useEffect, useState } from 'react';
 import Home from './pages/Home';
 import VolunteerDashboard from './pages/VolunteerDashboard';
 import EventPage from './pages/EventPage';
+import CoordinatorDashboard from './pages/CoordinatorDashboard';
+import AdminPanel from './pages/AdminPanel';
+import AuthPage from './pages/AuthPage';
+import TopNav from './components/TopNav';
 
 const DEFAULT_EVENTS = [
   { id: 1, title: 'CP Workshop: Graph Theory', club: 'CUET Computer Club', category: 'Workshop', date: 'Feb 10, 2026', location: 'Central Lab', summary: 'Master complex algorithms with top competitive programmers.', details: 'Bring a laptop. Hands-on sessions with problem sets.' },
@@ -13,6 +17,24 @@ const DEFAULT_EVENTS = [
 export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedEventId, setSelectedEventId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('currentUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [registeredUsers, setRegisteredUsers] = useState(() => {
+    try {
+      const raw = localStorage.getItem('registeredUsers');
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) return parsed;
+      return [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [events, setEvents] = useState(() => {
     try {
       const raw = localStorage.getItem('events');
@@ -26,19 +48,118 @@ export default function App() {
     try { localStorage.setItem('events', JSON.stringify(events)); } catch (e) {}
   }, [events]);
 
-  return (
-    <div>
-      {/* Navigation */}
-      <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex gap-4 bg-black/80 backdrop-blur-md p-2 rounded-full z-[100]">
-        <button onClick={() => setCurrentPage('home')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'home' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Home</button>
-        <button onClick={() => setCurrentPage('dashboard')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'dashboard' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Dashboard</button>
-        <button onClick={() => setCurrentPage('event')} className={`px-4 py-2 text-xs font-bold uppercase ${currentPage === 'event' ? 'bg-white text-black rounded-full' : 'text-white'}`}>Event</button>
-      </div>
+  useEffect(() => {
+    try { localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers)); } catch (e) {}
+  }, [registeredUsers]);
 
-      {/* Pages */}
-      {currentPage === 'home' && <Home events={events} setEvents={setEvents} setCurrentPage={setCurrentPage} setSelectedEvent={setSelectedEventId} />}
-      {currentPage === 'dashboard' && <VolunteerDashboard setCurrentPage={setCurrentPage} setSelectedEvent={setSelectedEventId} events={events} />}
-      {currentPage === 'event' && <EventPage events={events} setEvents={setEvents} selectedEventId={selectedEventId} setSelectedEvent={setSelectedEventId} setCurrentPage={setCurrentPage} />}
+  useEffect(() => {
+    if (!currentUser) {
+      try { localStorage.removeItem('currentUser'); } catch (e) {}
+      return;
+    }
+    try { localStorage.setItem('currentUser', JSON.stringify(currentUser)); } catch (e) {}
+  }, [currentUser]);
+
+  function openEvents(eventId = null) {
+    setSelectedEventId(eventId);
+    setCurrentPage('events');
+  }
+
+  function openDashboard() {
+    if (!currentUser) {
+      setCurrentPage('auth');
+      return;
+    }
+    if (currentUser.role === 'coordinator') setCurrentPage('coordinator');
+    else if (currentUser.role === 'admin') setCurrentPage('admin');
+    else setCurrentPage('volunteer');
+  }
+
+  function handleLogin(user) {
+    setCurrentUser(user);
+    if (user.role === 'coordinator') setCurrentPage('coordinator');
+    else if (user.role === 'admin') setCurrentPage('admin');
+    else setCurrentPage('volunteer');
+  }
+
+  function handleRegister(user) {
+    setRegisteredUsers((prev) => [...prev, user]);
+    setCurrentUser(user);
+    if (user.role === 'coordinator') setCurrentPage('coordinator');
+    else setCurrentPage('volunteer');
+  }
+
+  function handleLogout() {
+    setCurrentUser(null);
+    setCurrentPage('home');
+  }
+
+  function canAccess(page) {
+    if (page === 'volunteer') return currentUser?.role === 'volunteer';
+    if (page === 'coordinator') return currentUser?.role === 'coordinator';
+    if (page === 'admin') return currentUser?.role === 'admin';
+    return true;
+  }
+
+  return (
+    <div className="min-h-screen bg-amber-50 text-slate-900">
+      <TopNav
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        openDashboard={openDashboard}
+        currentUser={currentUser}
+        onLoginClick={() => setCurrentPage('auth')}
+        onLogout={handleLogout}
+      />
+
+      {currentPage === 'home' && (
+        <Home
+          events={events}
+          setSelectedEvent={setSelectedEventId}
+          openEvents={openEvents}
+        />
+      )}
+
+      {currentPage === 'events' && (
+        <EventPage
+          events={events}
+          setEvents={setEvents}
+          selectedEventId={selectedEventId}
+          setSelectedEvent={setSelectedEventId}
+        />
+      )}
+
+      {currentPage === 'auth' && (
+        <AuthPage
+          users={registeredUsers}
+          onLogin={handleLogin}
+          onRegister={handleRegister}
+        />
+      )}
+
+      {currentPage === 'volunteer' && canAccess('volunteer') && (
+        <VolunteerDashboard
+          events={events}
+          onBrowseEvents={() => setCurrentPage('events')}
+          onOpenEvent={openEvents}
+        />
+      )}
+
+      {currentPage === 'coordinator' && canAccess('coordinator') && (
+        <CoordinatorDashboard
+          events={events}
+          setEvents={setEvents}
+          onOpenEvent={openEvents}
+        />
+      )}
+
+      {currentPage === 'admin' && canAccess('admin') && <AdminPanel events={events} />}
+
+      {((currentPage === 'volunteer' && !canAccess('volunteer')) ||
+        (currentPage === 'coordinator' && !canAccess('coordinator')) ||
+        (currentPage === 'admin' && !canAccess('admin'))) && (
+        <AuthPage users={registeredUsers} onLogin={handleLogin} onRegister={handleRegister} />
+      )}
     </div>
   );
 }
