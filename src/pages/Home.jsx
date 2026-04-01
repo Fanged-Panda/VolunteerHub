@@ -3,7 +3,7 @@ import cuetEgg from '../assets/cuet with egg.jpeg';
 import rasel from '../assets/rasel.jpg';
 import tsc from '../assets/tsc.jpg';
 import asrro from '../assets/asrro.jpg';
-import work from '../assets/work.jpg';
+import workshop from '../assets/workshop.jpg';
 
 export default function Home({ events = [], setSelectedEvent, openEvents }) {
   const [activeSlide, setActiveSlide] = useState(0);
@@ -14,7 +14,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
       { src: rasel, alt: 'Rasel', label: 'Rasel Hall' },
       { src: tsc, alt: 'TSC cafeteria', label: 'TSC Cafeteria' },
       { src: asrro, alt: 'ASRRO', label: 'ASRRO' },
-      { src: work, alt: 'ASRRO', label: 'Workshop' },
+      { src: workshop, alt: 'ASRRO', label: 'Workshop' },
     ],
     [],
   );

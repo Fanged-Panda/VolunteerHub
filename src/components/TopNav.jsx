@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import cuetEgg from '../assets/cuet with egg.jpeg';
+import logo from '../assets/logo.png';
 
 const roleItems = {
   volunteer: { page: 'volunteer', label: 'Volunteer Dashboard' },
@@ -16,11 +16,8 @@ export default function TopNav({ currentPage, setCurrentPage, openDashboard, cur
     <header className="sticky top-0 z-40 border-b border-amber-200/70 bg-amber-50/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <button className="flex items-center gap-3" onClick={() => setCurrentPage('home')}>
-          <img src={cuetEgg} alt="CUET" className="h-10 w-10 rounded-lg border border-amber-200 object-cover" />
-          <div className="text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">CUET Clubs</p>
-            <p className="text-base font-black leading-none text-slate-900">VolunteerHub</p>
-          </div>
+          <img src={logo} alt="CUET" className="h-10 w-10 rounded-lg border border-amber-200 object-cover" />
+          <p className="text-base font-black leading-none text-slate-900">VolunteerHub</p>
         </button>
 
         <nav className="hidden items-center gap-2 md:flex">
