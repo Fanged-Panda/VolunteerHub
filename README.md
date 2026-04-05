@@ -39,7 +39,7 @@ Security behavior in production:
 
 ## Vercel Deployment Guidance
 
-This repository contains a Vite frontend and an Express + SQLite backend.
+This repository contains a Vite frontend and an Express + MySQL backend.
 
 - Frontend on Vercel: works well.
 - Current backend on Vercel (as-is): not recommended.
@@ -47,14 +47,14 @@ This repository contains a Vite frontend and an Express + SQLite backend.
 Why backend is not ideal on Vercel as-is:
 
 - The Express server here is not structured as Vercel serverless functions.
-- SQLite file storage is not a good fit for ephemeral/serverless filesystems.
+- It expects a persistent MySQL service and normal long-running Node process.
 
 Recommended deployment pattern:
 
 - Deploy frontend to Vercel.
 - Deploy backend to a persistent server platform (Render, Railway, Fly.io, VPS).
-- Use a persistent database (PostgreSQL/MySQL recommended for production).
-- Set `CORS_ORIGIN` on backend to your Vercel frontend URL.
+- Use a managed MySQL database in production.
+- Set `FRONTEND_URL` (and optional `CORS_ORIGIN`) on backend to your Vercel frontend URL.
 
 Admin login behavior:
 

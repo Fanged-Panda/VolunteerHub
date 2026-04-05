@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:web": "vite",
-    "dev:api": "nodemon server/index.js",
-    "start:api": "node server/index.js",
+    "dev:api": "nodemon api/index.js",
+    "start": "node api/index.js",
+    "start:api": "node api/index.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -22,11 +23,10 @@
     "framer-motion": "^12.29.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.563.0",
+    "mysql2": "^3.20.0",
     "nodemailer": "^8.0.4",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
