@@ -1,2 +1,6 @@
-show volunteer slot in the right side of the card but dont say volunteer slot, just 1/15 is fine
-
+1. Deleting coordinator also deletes their created events
+2. After applying to event, remove the share button
+3. Likewise, deleting volunteer also remove them from the events that they applied matter of fact you should use database for these so that every information stays consistent
+4. The response that the AI gives is not formatted correctly.
+5. Clicking away from the chat box should close it
+6. 

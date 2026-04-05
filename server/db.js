@@ -1,6 +1,12 @@
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const CLUBS = [
   'CUET Computer Club',
@@ -27,11 +33,17 @@ export async function initDb() {
   const enableDevSeed = !isProduction && process.env.ENABLE_DEV_SEED !== 'false';
   const bootstrapAdminEmail = String(process.env.ADMIN_BOOTSTRAP_EMAIL || '').trim().toLowerCase();
   const bootstrapAdminPassword = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || '').trim();
+  // Use Railway volume path if provided, otherwise keep a local file for development.
+  const dbPath = process.env.DATABASE_URL || path.join(__dirname, 'volunteerhub.db');
+
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   const db = await open({
-    filename: './server/volunteerhub.db',
+    filename: dbPath,
     driver: sqlite3.Database,
   });
+
+  console.log('Connected to SQLite at:', dbPath);
 
   await db.exec('PRAGMA foreign_keys = ON;');
 

@@ -6,6 +6,7 @@ import CoordinatorDashboard from './pages/CoordinatorDashboard';
 import AdminPanel from './pages/AdminPanel';
 import AuthPage from './pages/AuthPage';
 import TopNav from './components/TopNav';
+import ChatbotWidget from './components/ChatbotWidget';
 import { apiRequest, clearStoredToken, getStoredToken, setStoredToken } from './lib/api';
 
 const PAGE_SET = new Set(['home', 'events', 'auth', 'volunteer', 'coordinator', 'admin']);
@@ -154,7 +155,7 @@ export default function App() {
       } else {
         setCurrentUser(null);
       }
-    } catch (err) {
+    } catch {
       clearStoredToken();
       setToken('');
       setCurrentUser(null);
@@ -479,6 +480,8 @@ export default function App() {
           onRegister={handleRegister}
         />
       )}
+
+      <ChatbotWidget />
     </div>
   );
 }

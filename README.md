@@ -36,3 +36,51 @@ Security behavior in production:
 - Cross-origin requests are restricted to `CORS_ORIGIN`
 - No hardcoded admin shortcut login exists
 - Demo users/events are not auto-seeded unless explicitly enabled
+
+## Vercel Deployment Guidance
+
+This repository contains a Vite frontend and an Express + SQLite backend.
+
+- Frontend on Vercel: works well.
+- Current backend on Vercel (as-is): not recommended.
+
+Why backend is not ideal on Vercel as-is:
+
+- The Express server here is not structured as Vercel serverless functions.
+- SQLite file storage is not a good fit for ephemeral/serverless filesystems.
+
+Recommended deployment pattern:
+
+- Deploy frontend to Vercel.
+- Deploy backend to a persistent server platform (Render, Railway, Fly.io, VPS).
+- Use a persistent database (PostgreSQL/MySQL recommended for production).
+- Set `CORS_ORIGIN` on backend to your Vercel frontend URL.
+
+Admin login behavior:
+
+- You can log in with username `admin` (or admin email).
+- Password is the stored admin account password (no hardcoded bypass).
+
+## Groq Chatbot Setup
+
+This project now includes an in-app chatbot that answers questions about VolunteerHub.
+
+1. Create a Groq API key: https://console.groq.com/keys
+2. Put the key in your backend `.env` file:
+
+```env
+GROQ_API_KEY=your_api_key_here
+GROQ_MODEL=llama-3.1-8b-instant
+```
+
+3. Start the app with:
+
+```bash
+npm run dev
+```
+
+Implementation details:
+
+- Frontend widget sends questions to `POST /api/chatbot/ask`
+- Backend calls Groq using your server-side API key (key is not exposed to browser)
+- Assistant is instructed to answer only VolunteerHub-related questions

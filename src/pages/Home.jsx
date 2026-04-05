@@ -4,6 +4,7 @@ import rasel from '../assets/rasel.jpg';
 import tsc from '../assets/tsc.jpg';
 import asrro from '../assets/asrro.jpg';
 import workshop from '../assets/workshop.jpg';
+import pulak from '../assets/pulak.png';
 
 export default function Home({ events = [], setSelectedEvent, openEvents }) {
   const [activeSlide, setActiveSlide] = useState(0);
@@ -15,6 +16,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
       { src: tsc, alt: 'TSC cafeteria', label: 'TSC Cafeteria' },
       { src: asrro, alt: 'ASRRO', label: 'ASRRO' },
       { src: workshop, alt: 'ASRRO', label: 'Workshop' },
+      { src: pulak, alt: 'pulak', label: 'pulak' },
     ],
     [],
   );
@@ -27,7 +29,8 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const upcoming = useMemo(() => events.filter((event) => event.date >= todayKey).slice(0, 4), [events, todayKey]);
+  const upcoming = useMemo(() => events.filter((event) => event.date >= todayKey).slice(0, 8), [events, todayKey]);
+  const marqueeEvents = useMemo(() => (upcoming.length ? [...upcoming, ...upcoming] : []), [upcoming]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -125,25 +128,37 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
           <h2 className="text-2xl font-black text-slate-900">Upcoming Events</h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {upcoming.map((event) => (
-            <article key={event.id} className="flex h-full flex-col rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">{event.club}</p>
-              <h3 className="mt-2 text-lg font-black text-slate-900">{event.title}</h3>
-              <p className="mt-1 text-sm text-slate-600">{event.date} • {event.location}</p>
-              <p className="mt-4 flex-1 text-sm leading-relaxed text-slate-600">{event.summary}</p>
-              <button
-                className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
-                onClick={() => {
-                  setSelectedEvent(event.id);
-                  openEvents(event.id);
-                }}
-              >
-                Details & Apply
-              </button>
-            </article>
-          ))}
-        </div>
+        {upcoming.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No upcoming events available right now.</p>
+        ) : (
+          <div className="vh-marquee">
+            <div className="vh-marquee-track">
+              {marqueeEvents.map((event, index) => (
+                <article
+                  key={`${event.id}-${index}`}
+                  className="mr-4 flex h-[19rem] w-[19rem] shrink-0 flex-col rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">{event.club}</p>
+                    <p className="text-sm font-black text-slate-800">{event.registeredVolunteers || 0}/{event.neededVolunteers || 1}</p>
+                  </div>
+                  <h3 className="vh-line-clamp-2 mt-2 text-lg font-black text-slate-900">{event.title}</h3>
+                  <p className="mt-1 text-sm text-slate-600">{event.date} • {event.location}</p>
+                  <p className="mt-4 flex-1 overflow-hidden text-sm leading-relaxed text-slate-600">{event.summary}</p>
+                  <button
+                    className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                    onClick={() => {
+                      setSelectedEvent(event.id);
+                      openEvents(event.id);
+                    }}
+                  >
+                    Details & Apply
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Trusted Clubs */}

@@ -9,6 +9,8 @@ import { initDb } from './db.js';
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const GROQ_API_KEY = String(process.env.GROQ_API_KEY || '').trim();
+const GROQ_MODEL = String(process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim();
 const ALLOWED_ORIGINS = String(process.env.CORS_ORIGIN || '')
   .split(',')
   .map((item) => item.trim())
@@ -90,6 +92,46 @@ function roleRequired(...roles) {
     }
     next();
   };
+}
+
+function summarizeRoleMix(usersByRole) {
+  const counts = {
+    volunteer: 0,
+    coordinator: 0,
+    admin: 0,
+  };
+
+  for (const row of usersByRole) {
+    if (Object.hasOwn(counts, row.role)) counts[row.role] = row.count;
+  }
+
+  return counts;
+}
+
+function makeWebsiteContext({ counts, clubs, upcomingEvents }) {
+  const clubList = clubs.slice(0, 12).join(', ') || 'No clubs configured yet.';
+  const eventsText = upcomingEvents.length
+    ? upcomingEvents
+      .map((event) => `${event.title} on ${event.date} at ${event.location} (${event.club})`)
+      .join('; ')
+    : 'No events are currently listed.';
+
+  return [
+    'Product: VolunteerHub web app for CUET student volunteering activities.',
+    'Primary pages: Home, Events, Login/Register, Volunteer Dashboard, Coordinator Dashboard, Admin Panel.',
+    'Roles: volunteer, coordinator, admin.',
+    `Current stats: ${counts.volunteer} volunteers, ${counts.coordinator} coordinators, ${counts.admin} admins.`,
+    `Clubs: ${clubList}.`,
+    `Upcoming events snapshot: ${eventsText}.`,
+    'Volunteer abilities: browse events, apply/cancel, track assigned tasks, mark task completion.',
+    'Coordinator abilities: create/edit events, review applications, approve/reject applicants, assign tasks, track attendance.',
+    'Admin abilities: approve coordinator accounts, remove users, remove events, monitor totals.',
+  ].join('\n');
+}
+
+function extractGroqText(data) {
+  const firstChoice = Array.isArray(data?.choices) ? data.choices[0] : null;
+  return String(firstChoice?.message?.content || '').trim();
 }
 
 async function sendVerificationEmail(email, code) {
@@ -252,7 +294,9 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, username, password, remember } = req.body || {};
     const identifier = String(email || username || '').trim().toLowerCase();
 
-    const user = await db.get('SELECT * FROM users WHERE email = ?', identifier);
+    const user = identifier === 'admin'
+      ? await db.get("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")
+      : await db.get('SELECT * FROM users WHERE email = ?', identifier);
     if (!user) return res.status(401).json({ error: 'Invalid email or password.' });
 
     const valid = await bcrypt.compare(password || '', user.password_hash);
@@ -624,6 +668,99 @@ app.delete('/api/admin/events/:id', authRequired, roleRequired('admin'), async (
 
   await db.run('DELETE FROM events WHERE id = ?', eventId);
   res.json({ ok: true });
+});
+
+app.post('/api/chatbot/ask', async (req, res) => {
+  try {
+    const question = String(req.body?.question || '').trim();
+    if (!question) {
+      return res.status(400).json({ error: 'Question is required.' });
+    }
+    if (question.length > 1200) {
+      return res.status(400).json({ error: 'Question is too long. Please keep it under 1200 characters.' });
+    }
+    if (!GROQ_API_KEY) {
+      return res.status(503).json({
+        error: 'Chatbot is not configured. Set GROQ_API_KEY in your backend .env file.',
+      });
+    }
+
+    const [usersByRole, clubsRows, upcomingEvents] = await Promise.all([
+      db.all('SELECT role, COUNT(*) AS count FROM users GROUP BY role'),
+      db.all('SELECT DISTINCT club FROM events WHERE club IS NOT NULL AND TRIM(club) != "" ORDER BY club ASC'),
+      db.all(
+        `SELECT title, date, location, club
+         FROM events
+         ORDER BY date ASC, id DESC
+         LIMIT 8`,
+      ),
+    ]);
+
+    const counts = summarizeRoleMix(usersByRole || []);
+    const clubs = (clubsRows || []).map((row) => row.club).filter(Boolean);
+    const websiteContext = makeWebsiteContext({ counts, clubs, upcomingEvents: upcomingEvents || [] });
+
+    const payload = {
+      model: GROQ_MODEL,
+      temperature: 0.4,
+      max_tokens: 350,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            'You are VolunteerHub assistant.',
+            'Answer only questions related to this website and how users can use it.',
+            'If the question is unrelated, politely say you can only help with VolunteerHub.',
+            'Keep responses concise, practical, and factual.',
+            'Do not invent unavailable features.',
+          ].join(' '),
+        },
+        {
+          role: 'user',
+          content: `Website context:\n${websiteContext}\n\nUser question: ${question}`,
+        },
+      ],
+    };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    let response;
+    try {
+      response = await fetch(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        },
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const upstreamError = data?.error?.message || 'Groq request failed.';
+      return res.status(502).json({ error: upstreamError });
+    }
+
+    const answer = extractGroqText(data);
+    if (!answer) {
+      return res.status(502).json({ error: 'Groq returned an empty response.' });
+    }
+
+    return res.json({ ok: true, answer });
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      return res.status(504).json({ error: 'Chatbot request timed out. Please try again.' });
+    }
+    return res.status(500).json({ error: err.message || 'Failed to process chatbot request.' });
+  }
 });
 
 app.listen(PORT, () => {
