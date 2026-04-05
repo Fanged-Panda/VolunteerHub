@@ -14,3 +14,25 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Production Deployment Notes
+
+Before deploying, copy `.env.example` to `.env` and set real values.
+
+Required production settings:
+
+- `NODE_ENV=production`
+- `JWT_SECRET` as a long random secret
+- `CORS_ORIGIN` with your frontend URL(s)
+- SMTP or Gmail app-password variables for verification email
+
+Recommended production settings:
+
+- `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` to create the first admin account once
+- Keep `ENABLE_DEV_SEED=false` in production
+
+Security behavior in production:
+
+- Cross-origin requests are restricted to `CORS_ORIGIN`
+- No hardcoded admin shortcut login exists
+- Demo users/events are not auto-seeded unless explicitly enabled

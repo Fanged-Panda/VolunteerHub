@@ -7,7 +7,7 @@ const roleItems = {
   admin: { page: 'admin', label: 'Admin Panel' },
 };
 
-export default function TopNav({ currentPage, setCurrentPage, openDashboard, currentUser, onLoginClick, onLogout }) {
+export default function TopNav({ currentPage, navigateTo, openDashboard, currentUser, onLoginClick, onLogout }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeRoleItem = currentUser ? roleItems[currentUser.role] : null;
   const isRolePageActive = Boolean(activeRoleItem && currentPage === activeRoleItem.page);
@@ -15,20 +15,20 @@ export default function TopNav({ currentPage, setCurrentPage, openDashboard, cur
   return (
     <header className="sticky top-0 z-40 border-b border-amber-200/70 bg-amber-50/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <button className="flex items-center gap-3" onClick={() => setCurrentPage('home')}>
-          <img src={logo} alt="CUET" className="h-10 w-10 rounded-lg border border-amber-200 object-cover" />
+        <button className="flex items-center gap-3" onClick={() => navigateTo('home')}>
+          <img src={logo} alt="CUET" className="h-10 w-10 rounded-lg object-cover" />
           <p className="text-base font-black leading-none text-slate-900">VolunteerHub</p>
         </button>
 
         <nav className="hidden items-center gap-2 md:flex">
           <button
-            onClick={() => setCurrentPage('home')}
+            onClick={() => navigateTo('home')}
             className={`rounded-full px-4 py-2 text-sm font-bold ${currentPage === 'home' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-amber-100'}`}
           >
             Home
           </button>
           <button
-            onClick={() => setCurrentPage('events')}
+            onClick={() => navigateTo('events')}
             className={`rounded-full px-4 py-2 text-sm font-bold ${currentPage === 'events' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-amber-100'}`}
           >
             Events
@@ -50,12 +50,15 @@ export default function TopNav({ currentPage, setCurrentPage, openDashboard, cur
               Login
             </button>
           ) : (
-            <button
-              onClick={onLogout}
-              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-            >
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Signed in as {currentUser.name}</span>
+              <button
+                onClick={onLogout}
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Logout
+              </button>
+            </div>
           )}
         </nav>
 
@@ -70,8 +73,8 @@ export default function TopNav({ currentPage, setCurrentPage, openDashboard, cur
       {mobileOpen && (
         <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 md:hidden">
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => { setCurrentPage('home'); setMobileOpen(false); }} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold">Home</button>
-            <button onClick={() => { setCurrentPage('events'); setMobileOpen(false); }} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold">Events</button>
+            <button onClick={() => { navigateTo('home'); setMobileOpen(false); }} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold">Home</button>
+            <button onClick={() => { navigateTo('events'); setMobileOpen(false); }} className="rounded-lg bg-white px-3 py-2 text-sm font-semibold">Events</button>
             {activeRoleItem && (
               <button
                 onClick={() => { openDashboard(); setMobileOpen(false); }}
@@ -88,12 +91,15 @@ export default function TopNav({ currentPage, setCurrentPage, openDashboard, cur
                 Login
               </button>
             ) : (
-              <button
-                onClick={() => { onLogout(); setMobileOpen(false); }}
-                className="rounded-lg bg-white px-3 py-2 text-sm font-semibold"
-              >
-                Logout
-              </button>
+              <>
+                <div className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-600">Signed in as {currentUser.name}</div>
+                <button
+                  onClick={() => { onLogout(); setMobileOpen(false); }}
+                  className="rounded-lg bg-white px-3 py-2 text-sm font-semibold"
+                >
+                  Logout
+                </button>
+              </>
             )}
           </div>
         </div>

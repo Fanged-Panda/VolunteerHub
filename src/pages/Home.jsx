@@ -19,7 +19,15 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
     [],
   );
 
-  const upcoming = useMemo(() => events.slice(0, 4), [events]);
+  const todayKey = useMemo(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
+
+  const upcoming = useMemo(() => events.filter((event) => event.date >= todayKey).slice(0, 4), [events, todayKey]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -115,7 +123,6 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
       <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-2xl font-black text-slate-900">Upcoming Events</h2>
-          <button onClick={() => openEvents()} className="text-sm font-bold text-orange-600 hover:text-orange-700">View all</button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
