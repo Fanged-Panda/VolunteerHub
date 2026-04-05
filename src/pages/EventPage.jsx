@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import StatusBadge from '../components/StatusBadge';
 
 export default function EventPage({
@@ -14,18 +14,8 @@ export default function EventPage({
   const [query, setQuery] = useState('');
   const [clubFilter, setClubFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
-  const [selected, setSelected] = useState(events[0] || null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (selectedEventId) {
-      const found = events.find((event) => event.id === selectedEventId);
-      if (found) setSelected(found);
-      return;
-    }
-    if (!selected && events.length) setSelected(events[0]);
-  }, [selectedEventId, events, selected]);
 
   const clubs = useMemo(() => ['All', ...Array.from(new Set(events.map((event) => event.club || 'Unknown Club')))], [events]);
 
@@ -51,6 +41,17 @@ export default function EventPage({
       return dateActive && queryMatch && clubMatch && dateMatch;
     });
   }, [events, query, clubFilter, dateFilter, todayKey]);
+
+  // Compute the selected event from the current filters and selectedEventId.
+  // If there are no filtered events, `selected` will be null so the details
+  // panel hides instead of showing an out-of-filter event.
+  const selected = useMemo(() => {
+    if (selectedEventId) {
+      const found = events.find((event) => event.id === selectedEventId);
+      if (found) return found;
+    }
+    return filteredEvents.length ? filteredEvents[0] : null;
+  }, [selectedEventId, events, filteredEvents]);
 
   function getApplicationForEvent(eventId) {
     if (!currentUser || currentUser.role !== 'volunteer') return null;
@@ -147,10 +148,7 @@ export default function EventPage({
               return (
                 <button
                   key={event.id}
-                  onClick={() => {
-                    setSelected(event);
-                    setSelectedEvent(event.id);
-                  }}
+                  onClick={() => setSelectedEvent(event.id)}
                   className={`w-full rounded-xl border p-3 text-left transition ${active ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                 >
                   <p className="text-xs font-black uppercase tracking-[0.12em] text-amber-700">{event.club}</p>

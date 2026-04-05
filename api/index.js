@@ -11,10 +11,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const GROQ_API_KEY = String(process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = String(process.env.GROQ_MODEL || 'llama-3.1-8b-instant').trim();
-const ALLOWED_ORIGINS = String(process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((item) => item.trim())
-  .filter(Boolean);
 const CLUBS = [
   'CUET Computer Club',
   'ASRRO',
@@ -29,16 +25,24 @@ const CLUBS = [
 const CUET_STUDENT_EMAIL = /^u\d+@student\.cuet\.ac\.bd$/i;
 
 const app = express();
-if (IS_PRODUCTION && !process.env.CORS_ORIGIN) {
-  console.warn('CORS_ORIGIN is not set in production. Cross-origin browser requests will be blocked.');
-}
 
 app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (!IS_PRODUCTION) return callback(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+
+      if (origin === 'https://volunteer-hub-three.vercel.app') {
+        return callback(null, true);
+      }
+
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+        return callback(null, true);
+      }
+
       return callback(new Error('CORS not allowed for this origin.'));
     },
     credentials: true,
@@ -289,7 +293,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+async function handleLogin(req, res) {
   try {
     const { email, username, password, remember } = req.body || {};
     const identifier = String(email || username || '').trim().toLowerCase();
@@ -307,6 +311,14 @@ app.post('/api/auth/login', async (req, res) => {
   } catch {
     return res.status(500).json({ error: 'Login failed.' });
   }
+}
+
+app.post('/api/auth/login', handleLogin);
+// Compatibility alias for clients that post to /api/auth.
+app.post('/api/auth', handleLogin);
+
+app.get('/api/auth', (req, res) => {
+  return res.status(405).json({ error: 'Method not allowed. Use POST /api/auth/login.' });
 });
 
 app.get('/api/auth/me', authRequired, async (req, res) => {
@@ -687,7 +699,7 @@ app.post('/api/chatbot/ask', async (req, res) => {
 
     const [usersByRole, clubsRows, upcomingEvents] = await Promise.all([
       db.all('SELECT role, COUNT(*) AS count FROM users GROUP BY role'),
-      db.all('SELECT DISTINCT club FROM events WHERE club IS NOT NULL AND TRIM(club) != "" ORDER BY club ASC'),
+      db.all("SELECT DISTINCT club FROM events WHERE club IS NOT NULL AND TRIM(club) != '' ORDER BY club ASC"),
       db.all(
         `SELECT title, date, location, club
          FROM events
@@ -763,6 +775,10 @@ app.post('/api/chatbot/ask', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`VolunteerHub API running on http://localhost:${PORT}`);
-});
+if (!IS_PRODUCTION) {
+  app.listen(PORT, () => {
+    console.log(`VolunteerHub API running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
