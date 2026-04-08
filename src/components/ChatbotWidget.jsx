@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { apiRequest } from '../lib/api';
 import logo from '../assets/logo.png';
 
@@ -24,6 +26,7 @@ export default function ChatbotWidget() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const widgetRef = useRef(null);
   const chatEndRef = useRef(null);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !sending, [draft, sending]);
@@ -39,6 +42,23 @@ export default function ChatbotWidget() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [isOpen, messages, sending]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handleOutsideClick(event) {
+      if (widgetRef.current && !widgetRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isOpen]);
 
   async function sendQuestion(text) {
     const question = String(text || '').trim();
@@ -86,7 +106,7 @@ export default function ChatbotWidget() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
+    <div ref={widgetRef} className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
       {isOpen && (
         <div className="mb-3 flex h-[30rem] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-orange-100 bg-orange-50 px-4 py-3">
@@ -112,7 +132,22 @@ export default function ChatbotWidget() {
                     : 'mr-auto border border-slate-200 bg-slate-50 text-slate-800'
                 }`}
               >
-                {message.text}
+                {message.role === 'assistant' ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
+                      ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
+                      li: ({ children }) => <li className="break-words">{children}</li>,
+                      strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                    }}
+                  >
+                    {message.text}
+                  </ReactMarkdown>
+                ) : (
+                  <span className="whitespace-pre-wrap break-words">{message.text}</span>
+                )}
               </div>
             ))}
 

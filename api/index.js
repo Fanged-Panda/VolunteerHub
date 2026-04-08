@@ -138,7 +138,7 @@ function extractGroqText(data) {
   return String(firstChoice?.message?.content || '').trim();
 }
 
-async function sendVerificationEmail(email, code) {
+async function sendMailMessage({ to, subject, text }) {
   const smtpHost = process.env.SMTP_HOST;
   const smtpPort = Number(process.env.SMTP_PORT || 587);
   const smtpUser = process.env.SMTP_USER;
@@ -165,18 +165,29 @@ async function sendVerificationEmail(email, code) {
     fromAddress = process.env.SMTP_FROM || mailUser;
   } else {
     throw new Error(
-      'Email verification is not configured. Set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS (optional SMTP_FROM), or MAIL_USER and MAIL_APP_PASS.',
+      'Email service is not configured. Set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS (optional SMTP_FROM), or MAIL_USER and MAIL_APP_PASS.',
     );
   }
 
-  await transporter.sendMail({
-    from: fromAddress,
+  await transporter.sendMail({ from: fromAddress, to, subject, text });
+
+  return { delivered: true, preview: null };
+}
+
+async function sendVerificationEmail(email, code) {
+  return sendMailMessage({
     to: email,
     subject: 'VolunteerHub verification code',
     text: `Your VolunteerHub verification code is: ${code}`,
   });
+}
 
-  return { delivered: true, preview: null };
+async function sendPasswordResetEmail(email, code) {
+  return sendMailMessage({
+    to: email,
+    subject: 'VolunteerHub password reset code',
+    text: `Use this code to reset your VolunteerHub password: ${code}. This code expires in 10 minutes.`,
+  });
 }
 
 const db = await initDb();
@@ -218,6 +229,83 @@ app.post('/api/auth/request-verification', async (req, res) => {
     return res.json({ ok: true, message: 'Verification code sent.' });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to request verification.' });
+  }
+});
+
+app.post('/api/auth/forgot-password/request', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!CUET_STUDENT_EMAIL.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Use your CUET student email (uXXXXXXXX@student.cuet.ac.bd)." });
+    }
+
+    const user = await db.get('SELECT id FROM users WHERE email = ?', normalizedEmail);
+    if (user) {
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const now = Date.now();
+      const expires = now + 10 * 60 * 1000;
+
+      await db.run('DELETE FROM password_reset_codes WHERE email = ?', normalizedEmail);
+      await db.run(
+        'INSERT INTO password_reset_codes (email, code, expires_at, created_at) VALUES (?, ?, ?, ?)',
+        [normalizedEmail, code, expires, now],
+      );
+      await sendPasswordResetEmail(normalizedEmail, code);
+    }
+
+    return res.json({
+      ok: true,
+      message: 'If an account exists for this email, a password reset code has been sent.',
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Could not request password reset.' });
+  }
+});
+
+app.post('/api/auth/forgot-password/reset', async (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body || {};
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedCode = String(code || '').trim();
+
+    if (!CUET_STUDENT_EMAIL.test(normalizedEmail)) {
+      return res.status(400).json({ error: "Use your CUET student email (uXXXXXXXX@student.cuet.ac.bd)." });
+    }
+    if (!normalizedCode) {
+      return res.status(400).json({ error: 'Reset code is required.' });
+    }
+    if (!newPassword || String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+    }
+
+    const resetRecord = await db.get(
+      'SELECT * FROM password_reset_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1',
+      normalizedEmail,
+    );
+    if (!resetRecord) {
+      return res.status(400).json({ error: 'Request a password reset code first.' });
+    }
+    if (Date.now() > Number(resetRecord.expires_at || 0)) {
+      return res.status(400).json({ error: 'Reset code expired. Request a new one.' });
+    }
+    if (String(resetRecord.code) !== normalizedCode) {
+      return res.status(400).json({ error: 'Invalid reset code.' });
+    }
+
+    const user = await db.get('SELECT id FROM users WHERE email = ?', normalizedEmail);
+    if (!user) {
+      return res.status(400).json({ error: 'Account not found.' });
+    }
+
+    const hash = await bcrypt.hash(String(newPassword), 10);
+    await db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, user.id]);
+    await db.run('DELETE FROM password_reset_codes WHERE email = ?', normalizedEmail);
+
+    return res.json({ ok: true, message: 'Password reset successful. You can now log in.' });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Could not reset password.' });
   }
 });
 
@@ -724,6 +812,7 @@ app.post('/api/chatbot/ask', async (req, res) => {
             'Answer only questions related to this website and how users can use it.',
             'If the question is unrelated, politely say you can only help with VolunteerHub.',
             'Keep responses concise, practical, and factual.',
+            'Format responses in clear markdown with short paragraphs and bullet points when useful.',
             'Do not invent unavailable features.',
           ].join(' '),
         },

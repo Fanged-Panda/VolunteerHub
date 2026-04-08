@@ -254,6 +254,32 @@ export default function App() {
     }
   }
 
+  async function handleForgotPasswordRequest(payload) {
+    try {
+      const data = await apiRequest('/api/auth/forgot-password/request', {
+        method: 'POST',
+        token: '',
+        body: payload,
+      });
+      return { ok: true, message: data.message };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  async function handleForgotPasswordReset(payload) {
+    try {
+      const data = await apiRequest('/api/auth/forgot-password/reset', {
+        method: 'POST',
+        token: '',
+        body: payload,
+      });
+      return { ok: true, message: data.message };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
   function handleLogout() {
     clearStoredToken();
     setToken('');
@@ -283,6 +309,7 @@ export default function App() {
   async function handleApply(eventId) {
     try {
       await apiRequest(`/api/events/${eventId}/apply`, { method: 'POST', token });
+      await refreshEvents();
       await refreshRoleData();
       return { ok: true };
     } catch (err) {
@@ -293,6 +320,7 @@ export default function App() {
   async function handleCancelApplication(eventId) {
     try {
       await apiRequest(`/api/events/${eventId}/application`, { method: 'DELETE', token });
+      await refreshEvents();
       await refreshRoleData();
       return { ok: true };
     } catch (err) {
@@ -431,6 +459,8 @@ export default function App() {
           onLogin={handleLogin}
           onRequestVerification={handleRequestVerification}
           onRegister={handleRegister}
+          onForgotPasswordRequest={handleForgotPasswordRequest}
+          onForgotPasswordReset={handleForgotPasswordReset}
         />
       )}
 
@@ -478,6 +508,8 @@ export default function App() {
           onLogin={handleLogin}
           onRequestVerification={handleRequestVerification}
           onRegister={handleRegister}
+          onForgotPasswordRequest={handleForgotPasswordRequest}
+          onForgotPasswordReset={handleForgotPasswordReset}
         />
       )}
 

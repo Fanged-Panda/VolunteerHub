@@ -6,6 +6,65 @@ import asrro from '../assets/asrro.jpg';
 import workshop from '../assets/workshop.jpg';
 import pulak from '../assets/pulak.png';
 
+const WORKFLOW_STEPS = [
+  {
+    title: 'Discover Events',
+    text: 'Browse live CUET club activities and compare roles, dates, and required volunteer counts before applying.',
+    accent: 'bg-orange-100 text-orange-700',
+  },
+  {
+    title: 'Apply Instantly',
+    text: 'Apply in one tap and track your status in real-time from the volunteer dashboard.',
+    accent: 'bg-emerald-100 text-emerald-700',
+  },
+  {
+    title: 'Get Assigned Tasks',
+    text: 'Coordinators assign work and attendance directly, keeping all updates in one consistent flow.',
+    accent: 'bg-sky-100 text-sky-700',
+  },
+  {
+    title: 'Complete and Grow',
+    text: 'Mark tasks done, accumulate hours, and build your impact record across CUET clubs.',
+    accent: 'bg-violet-100 text-violet-700',
+  },
+];
+
+const VOLUNTEER_TRACKS = [
+  {
+    name: 'Technical Events',
+    subtitle: 'Workshops, hackathons, coding contests, robotics sessions',
+    badge: 'Hands-on',
+    palette: 'from-slate-900 via-slate-800 to-slate-700',
+  },
+  {
+    name: 'Community Outreach',
+    subtitle: 'Awareness campaigns, social drives, campus support initiatives',
+    badge: 'Field Work',
+    palette: 'from-orange-600 via-amber-600 to-yellow-500',
+  },
+  {
+    name: 'Operations & Logistics',
+    subtitle: 'Check-ins, attendee guidance, venue setup, coordination support',
+    badge: 'Leadership',
+    palette: 'from-emerald-700 via-teal-700 to-cyan-700',
+  },
+];
+
+const IMPACT_QUOTES = [
+  {
+    text: 'The dashboard made it easy to know exactly what I had to do before every club event.',
+    person: 'Volunteer - CSE 21',
+  },
+  {
+    text: 'Applicant management is now much cleaner. We approve, assign, and track everything in one place.',
+    person: 'Coordinator - CUET Computer Club',
+  },
+  {
+    text: 'A centralized workflow keeps event participation consistent across all clubs.',
+    person: 'Campus Admin Team',
+  },
+];
+
 export default function Home({ events = [], setSelectedEvent, openEvents }) {
   const [activeSlide, setActiveSlide] = useState(0);
 
@@ -31,6 +90,46 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
 
   const upcoming = useMemo(() => events.filter((event) => event.date >= todayKey).slice(0, 8), [events, todayKey]);
   const marqueeEvents = useMemo(() => (upcoming.length ? [...upcoming, ...upcoming] : []), [upcoming]);
+  const spotlightEvents = useMemo(() => upcoming.slice(0, 3), [upcoming]);
+  const timelineEvents = useMemo(() => upcoming.slice(0, 5), [upcoming]);
+
+  const quickStats = useMemo(() => {
+    const activeClubs = new Set(upcoming.map((event) => String(event.club || '').trim()).filter(Boolean)).size;
+    const registered = upcoming.reduce((sum, event) => sum + Number(event.registeredVolunteers || 0), 0);
+    const slots = upcoming.reduce(
+      (sum, event) => sum + Number(event.neededVolunteers || event.needed_volunteers || 0),
+      0,
+    );
+
+    return [
+      { label: 'Upcoming Events', value: upcoming.length, hint: 'Live now' },
+      { label: 'Active Clubs', value: activeClubs, hint: 'Campus-wide' },
+      { label: 'Registered Volunteers', value: registered, hint: 'Current records' },
+      { label: 'Open Slots', value: Math.max(slots - registered, 0), hint: 'Still available' },
+    ];
+  }, [upcoming]);
+
+  const clubMomentum = useMemo(() => {
+    const counts = {};
+    upcoming.forEach((event) => {
+      const club = String(event.club || 'Unknown Club');
+      counts[club] = (counts[club] || 0) + 1;
+    });
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([club, count], index) => ({
+        club,
+        count,
+        tone:
+          index % 3 === 0
+            ? 'bg-orange-100 text-orange-700'
+            : index % 3 === 1
+              ? 'bg-sky-100 text-sky-700'
+              : 'bg-emerald-100 text-emerald-700',
+      }));
+  }, [upcoming]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -48,82 +147,111 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
     setActiveSlide((prev) => (prev + 1) % slides.length);
   }
 
+  function openEventDetails(eventId) {
+    setSelectedEvent(eventId);
+    openEvents(eventId);
+  }
+
   return (
-    <main>
-      <section className="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
-        <div>
-          <p className="mb-4 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-800">
-            Official CUET Club Events
-          </p>
-          <h1 className="text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
-            Volunteer for CUET Clubs,
-            <span className="block text-orange-500">One Event at a Time</span>
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-            Discover CUET-only events, apply quickly, track tasks, and contribute to your campus community with a modern volunteer workflow.
-          </p>
+    <main className="relative overflow-hidden">
+      <section className="relative overflow-hidden">
+        <div className="vh-grid-pattern absolute inset-0 opacity-40" />
+        <div className="vh-float-slow absolute -left-24 top-12 h-56 w-56 rounded-full bg-orange-300/30 blur-3xl" />
+        <div className="vh-float-slow vh-float-delay absolute -right-16 top-32 h-64 w-64 rounded-full bg-amber-300/30 blur-3xl" />
 
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button
-              onClick={() => openEvents()}
-              className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600"
-            >
-              Explore Events
-            </button>
-          </div>
-        </div>
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-12 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:py-16">
+          <div>
+            <p className="mb-4 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-amber-800">
+              Official CUET Club Events
+            </p>
+            <h1 className="text-4xl font-black leading-tight text-slate-900 sm:text-5xl lg:text-6xl">
+              Volunteer for CUET Clubs,
+              <span className="block text-orange-500">Build Impact That Scales</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+              Discover CUET-only opportunities, apply faster, coordinate better, and track every contribution from one unified platform.
+            </p>
 
-        <div className="relative overflow-hidden rounded-3xl shadow-2xl">
-          {slides.map((slide, index) => (
-            <img
-              key={slide.label}
-              src={slide.src}
-              alt={slide.alt}
-              className={`absolute left-0 top-0 h-[420px] w-full object-cover transition-opacity duration-700 ${
-                index === activeSlide ? 'opacity-100' : 'opacity-0'
-              }`}
-            />
-          ))}
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
-          <div className="relative flex h-[420px] items-end justify-between p-4">
-            <div className="rounded-full bg-black/50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-              {slides[activeSlide].label}
-            </div>
-
-            <div className="flex items-center gap-2">
+            <div className="mt-8 flex flex-wrap gap-3">
               <button
-                onClick={goPrev}
-                className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
-                aria-label="Previous image"
+                onClick={() => openEvents()}
+                className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600"
               >
-                Prev
+                Explore Events
               </button>
-              <button
-                onClick={goNext}
-                className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
-                aria-label="Next image"
+              <a
+                href="#campus-timeline"
+                className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
               >
-                Next
-              </button>
+                View Campus Timeline
+              </a>
             </div>
           </div>
 
-          <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2">
+          <div className="relative overflow-hidden rounded-3xl border border-amber-200/80 shadow-2xl">
             {slides.map((slide, index) => (
-              <button
-                key={slide.label + '-dot'}
-                onClick={() => setActiveSlide(index)}
-                className={`h-2.5 rounded-full transition-all ${index === activeSlide ? 'w-7 bg-orange-500' : 'w-2.5 bg-white/80'}`}
-                aria-label={`Go to ${slide.label}`}
+              <img
+                key={slide.label}
+                src={slide.src}
+                alt={slide.alt}
+                className={`absolute left-0 top-0 h-[460px] w-full object-cover transition-opacity duration-700 ${
+                  index === activeSlide ? 'opacity-100' : 'opacity-0'
+                }`}
               />
             ))}
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
+
+            <div className="relative flex h-[460px] items-end justify-between p-4">
+              <div className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                {slides[activeSlide].label}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={goPrev}
+                  className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
+                  aria-label="Previous image"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={goNext}
+                  className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
+                  aria-label="Next image"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2">
+              {slides.map((slide, index) => (
+                <button
+                  key={slide.label + '-dot'}
+                  onClick={() => setActiveSlide(index)}
+                  className={`h-2.5 rounded-full transition-all ${index === activeSlide ? 'w-7 bg-orange-500' : 'w-2.5 bg-white/80'}`}
+                  aria-label={`Go to ${slide.label}`}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {quickStats.map((stat) => (
+            <article key={stat.label} className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">{stat.label}</p>
+              <p className="mt-2 text-3xl font-black text-slate-900">{stat.value}</p>
+              <p className="mt-1 text-xs font-semibold text-orange-600">{stat.hint}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-2xl font-black text-slate-900">Upcoming Events</h2>
         </div>
@@ -144,13 +272,10 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
                   </div>
                   <h3 className="vh-line-clamp-2 mt-2 text-lg font-black text-slate-900">{event.title}</h3>
                   <p className="mt-1 text-sm text-slate-600">{event.date} • {event.location}</p>
-                  <p className="mt-4 flex-1 overflow-hidden text-sm leading-relaxed text-slate-600">{event.summary}</p>
+                  <p className="mt-4 flex-1 overflow-hidden text-sm leading-relaxed text-slate-600">{event.details || event.summary || 'Details will be announced soon.'}</p>
                   <button
                     className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
-                    onClick={() => {
-                      setSelectedEvent(event.id);
-                      openEvents(event.id);
-                    }}
+                    onClick={() => openEventDetails(event.id)}
                   >
                     Details & Apply
                   </button>
@@ -161,14 +286,189 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
         )}
       </section>
 
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Volunteer Tracks</p>
+            <h2 className="mt-2 text-3xl font-black text-slate-900">Different Ways To Contribute</h2>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {VOLUNTEER_TRACKS.map((track) => (
+            <article
+              key={track.name}
+              className={`overflow-hidden rounded-3xl bg-gradient-to-br p-[1px] shadow-lg ${track.palette}`}
+            >
+              <div className="h-full rounded-[calc(1.5rem-1px)] bg-white p-5">
+                <p className="inline-block rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white">{track.badge}</p>
+                <h3 className="mt-3 text-2xl font-black text-slate-900">{track.name}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{track.subtitle}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="absolute inset-y-0 right-0 hidden w-2/5 rounded-3xl bg-gradient-to-b from-amber-100/40 to-orange-100/30 lg:block" />
+        <div className="relative grid gap-6 lg:grid-cols-2">
+          <article className="rounded-3xl border border-amber-100 bg-white p-6">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">How It Works</p>
+            <h2 className="mt-2 text-3xl font-black text-slate-900">From Application To Impact</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              VolunteerHub keeps registration, approval, assignment, and completion in one connected workflow so clubs and volunteers stay aligned.
+            </p>
+
+            <div className="mt-6 space-y-3">
+              {WORKFLOW_STEPS.map((step, index) => (
+                <div key={step.title} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-black ${step.accent}`}>{String(index + 1).padStart(2, '0')}</span>
+                    <p className="text-base font-black text-slate-900">{step.title}</p>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{step.text}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article id="campus-timeline" className="rounded-3xl border border-amber-100 bg-white p-6">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Campus Timeline</p>
+            <h2 className="mt-2 text-3xl font-black text-slate-900">What Happens Next</h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              Track the next set of opportunities and jump directly into any event details.
+            </p>
+
+            <div className="mt-6 space-y-3">
+              {timelineEvents.length === 0 && (
+                <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No upcoming events in the timeline yet.</p>
+              )}
+
+              {timelineEvents.map((event, index) => (
+                <button
+                  key={event.id}
+                  onClick={() => openEventDetails(event.id)}
+                  className="group w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-orange-300 hover:bg-orange-50"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">{event.club}</p>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600">Stop {index + 1}</span>
+                  </div>
+                  <p className="mt-1 text-base font-black text-slate-900 group-hover:text-orange-700">{event.title}</p>
+                  <p className="mt-1 text-sm text-slate-600">{event.date} • {event.location}</p>
+                </button>
+              ))}
+            </div>
+          </article>
+        </div>
+      </section>
+
+
+
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Club Momentum</p>
+            <h2 className="mt-2 text-3xl font-black text-slate-900">Which Clubs Are Most Active</h2>
+          </div>
+        </div>
+
+        {clubMomentum.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">Add events to see club momentum cards.</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {clubMomentum.map((item) => (
+              <article key={item.club} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-base font-black text-slate-900">{item.club}</p>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${item.tone}`}>{item.count} upcoming</span>
+                </div>
+                <div className="mt-3 h-2 rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-orange-400 to-amber-500"
+                    style={{ width: `${Math.min(item.count * 22, 100)}%` }}
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Spotlight</p>
+          <h2 className="mt-2 text-3xl font-black text-slate-900">Featured Opportunities</h2>
+        </div>
+
+        {spotlightEvents.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No spotlight events available yet.</p>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-3">
+            {spotlightEvents.map((event, index) => (
+              <article
+                key={event.id}
+                className={`relative overflow-hidden rounded-3xl border border-amber-100 p-5 shadow-sm ${index === 0 ? 'lg:col-span-2 lg:min-h-[18rem]' : 'lg:min-h-[18rem]'}`}
+                style={{
+                  backgroundImage: event.imageUrl || event.image_url
+                    ? `linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.94)), url(${event.imageUrl || event.image_url})`
+                    : 'linear-gradient(135deg, rgba(255,247,237,0.95), rgba(255,255,255,0.97))',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700">{event.club}</p>
+                <h3 className="mt-2 text-2xl font-black text-slate-900">{event.title}</h3>
+                <p className="mt-2 text-sm text-slate-600">{event.date} • {event.location}</p>
+                <p className="mt-3 text-sm leading-relaxed text-slate-700">{event.details || event.summary || 'Full details available on the event page.'}</p>
+                <button
+                  onClick={() => openEventDetails(event.id)}
+                  className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
+                >
+                  Open Event
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">Impact Wall</p>
+          <h2 className="mt-2 text-3xl font-black text-slate-900">What People Are Saying</h2>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {IMPACT_QUOTES.map((quote, index) => (
+              <article key={quote.person} className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                <p className="text-sm leading-relaxed text-slate-700">"{quote.text}"</p>
+                <p className="mt-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500">{quote.person}</p>
+                <p className="mt-1 text-[10px] font-bold text-orange-600">Card #{String(index + 1).padStart(2, '0')}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => openEvents()}
+              className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
+            >
+              Join an Event Today
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* Trusted Clubs */}
-      <section className="bg-slate-50 py-20 px-10 text-center">
-        <h2 className="text-slate-400 font-semibold uppercase tracking-[0.2em] text-sm mb-10">Trusted by Clubs</h2>
-        <div className="flex flex-wrap justify-center gap-16 grayscale opacity-50">
-          <span className="text-3xl font-bold italic">Cuet Computer Club</span>
+      <section className="bg-slate-50 px-6 py-20 text-center sm:px-10">
+        <h2 className="mb-4 text-slate-400 text-sm font-semibold uppercase tracking-[0.2em]">Trusted by Clubs</h2>
+        
+        <div className="flex flex-wrap justify-center gap-16 grayscale opacity-60">
+          <span className="text-3xl font-bold italic">CUET Computer Club</span>
           <span className="text-3xl font-bold italic">ASRRO</span>
-          <span className="text-3xl font-bold italic">IEEE</span>
-          <span className="text-3xl font-bold italic">Joyodhoni</span>
+          <span className="text-3xl font-bold italic">IEEE CUET SB</span>
+          <span className="text-3xl font-bold italic">Joydhoni</span>
         </div>
       </section>
     </main>

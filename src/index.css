@@ -8,7 +8,7 @@
 .vh-marquee-track {
 	display: flex;
 	width: max-content;
-	animation: vh-marquee-left 36s linear infinite;
+	animation: vh-marquee-left 20s linear infinite;
 	will-change: transform;
 }
 
@@ -30,4 +30,31 @@
 	-webkit-line-clamp: 2;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
+}
+
+.vh-grid-pattern {
+	background-image:
+		linear-gradient(to right, rgba(148, 163, 184, 0.16) 1px, transparent 1px),
+		linear-gradient(to bottom, rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+	background-size: 30px 30px;
+}
+
+@keyframes vh-float {
+	0% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-16px);
+	}
+	100% {
+		transform: translateY(0);
+	}
+}
+
+.vh-float-slow {
+	animation: vh-float 9s ease-in-out infinite;
+}
+
+.vh-float-delay {
+	animation-delay: 2s;
 }
