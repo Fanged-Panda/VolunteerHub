@@ -26,6 +26,45 @@ async function ensureColumn(db, table, column, sqlTypeAndDefault) {
   }
 }
 
+async function ensureEventOwnerCascadeDelete(db) {
+  const existingRule = await db.get(
+    `SELECT DELETE_RULE AS deleteRule
+     FROM information_schema.REFERENTIAL_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = ? AND TABLE_NAME = 'events' AND CONSTRAINT_NAME = 'fk_events_created_by'
+     LIMIT 1`,
+    db.databaseName,
+  );
+
+  if (String(existingRule?.deleteRule || '').toUpperCase() === 'CASCADE') {
+    return;
+  }
+
+  if (existingRule) {
+    await db.exec(
+      `ALTER TABLE \`events\` DROP FOREIGN KEY \`fk_events_created_by\`;
+       ALTER TABLE \`events\`
+       ADD CONSTRAINT \`fk_events_created_by\`
+       FOREIGN KEY (\`created_by\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE`,
+    );
+    return;
+  }
+
+  const hasConstraint = await db.get(
+    `SELECT COUNT(*) AS count
+     FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'events' AND CONSTRAINT_NAME = 'fk_events_created_by'`,
+    db.databaseName,
+  );
+
+  if (!hasConstraint?.count) {
+    await db.exec(
+      `ALTER TABLE \`events\`
+       ADD CONSTRAINT \`fk_events_created_by\`
+       FOREIGN KEY (\`created_by\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE`,
+    );
+  }
+}
+
 function normalizeParams(params) {
   if (params.length === 1 && Array.isArray(params[0])) {
     return params[0];
@@ -154,7 +193,7 @@ function createSchemaSql() {
       created_at VARCHAR(64) NOT NULL,
       PRIMARY KEY (id),
       KEY idx_events_created_by (created_by),
-      CONSTRAINT fk_events_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      CONSTRAINT fk_events_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
     CREATE TABLE IF NOT EXISTS applications (
@@ -184,6 +223,16 @@ function createSchemaSql() {
       created_at BIGINT NOT NULL,
       PRIMARY KEY (id),
       KEY idx_verification_email (email)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+    CREATE TABLE IF NOT EXISTS password_reset_codes (
+      id INT NOT NULL AUTO_INCREMENT,
+      email VARCHAR(255) NOT NULL,
+      code VARCHAR(32) NOT NULL,
+      expires_at BIGINT NOT NULL,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (id),
+      KEY idx_password_reset_email (email)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `;
 }
@@ -215,6 +264,7 @@ export async function initDb() {
   await ensureColumn(db, 'events', 'image_url', 'TEXT');
   await ensureColumn(db, 'applications', 'assigned_tasks', 'LONGTEXT');
   await ensureColumn(db, 'users', 'department', 'VARCHAR(255)');
+  await ensureEventOwnerCascadeDelete(db);
 
   console.log(`Connected to MySQL at ${mysqlConfig.host}:${mysqlConfig.port}/${mysqlConfig.database}`);
 

@@ -1,8 +1,33 @@
 import React, { useState } from 'react';
 
 const CUET_EMAIL_HINT = 'uXXXXXXXX@student.cuet.ac.bd';
+const CUET_EMAIL_DOMAIN = '@student.cuet.ac.bd';
 
-export default function AuthPage({ clubs = [], onLogin, onRequestVerification, onRegister }) {
+function autoCompleteCuetEmail(rawValue) {
+  const raw = String(rawValue || '').trim().toLowerCase();
+  if (!raw) return '';
+  if (raw === 'admin') return raw;
+  if (raw.includes('@')) return raw;
+
+  if (/^\d{1,7}$/.test(raw)) {
+    const candidate = `u${raw}`;
+    return raw.length === 7 ? `${candidate}${CUET_EMAIL_DOMAIN}` : candidate;
+  }
+
+  if (/^u\d{1,7}$/.test(raw)) {
+    return raw.length === 8 ? `${raw}${CUET_EMAIL_DOMAIN}` : raw;
+  }
+
+  return raw;
+}
+
+function finalizeCuetEmail(rawValue) {
+  const candidate = autoCompleteCuetEmail(rawValue);
+  if (/^u\d{7}$/.test(candidate)) return `${candidate}${CUET_EMAIL_DOMAIN}`;
+  return candidate;
+}
+
+export default function AuthPage({ clubs = [], onLogin, onRequestVerification, onRegister, onForgotPasswordRequest, onForgotPasswordReset }) {
   const [tab, setTab] = useState('login');
   const departments = ['CSE', 'EEE', 'CE', 'ME', 'IPE', 'URP', 'ChE', 'Architecture', 'WRE', 'Other'];
 
@@ -18,6 +43,9 @@ export default function AuthPage({ clubs = [], onLogin, onRequestVerification, o
   });
 
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotStep, setForgotStep] = useState('request');
+  const [forgotData, setForgotData] = useState({ email: '', code: '', newPassword: '' });
   const [registerStep, setRegisterStep] = useState('form');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -33,6 +61,68 @@ export default function AuthPage({ clubs = [], onLogin, onRequestVerification, o
     if (!result?.ok) {
       setError(result?.error || 'Login failed.');
     }
+  }
+
+  async function requestForgotPasswordCode(e) {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const email = forgotData.email.trim();
+    if (!email) {
+      setError('Enter your account email first.');
+      return;
+    }
+
+    setLoading(true);
+    const result = await onForgotPasswordRequest({ email });
+    setLoading(false);
+
+    if (!result?.ok) {
+      setError(result?.error || 'Could not send reset code.');
+      return;
+    }
+
+    setSuccess(result?.message || 'Reset code sent. Check your email.');
+    setForgotStep('reset');
+  }
+
+  async function submitForgotPasswordReset(e) {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!forgotData.email.trim()) {
+      setError('Enter your account email.');
+      return;
+    }
+    if (!forgotData.code.trim()) {
+      setError('Enter the reset code.');
+      return;
+    }
+    if (forgotData.newPassword.length < 6) {
+      setError('New password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+    const result = await onForgotPasswordReset({
+      email: forgotData.email.trim(),
+      code: forgotData.code.trim(),
+      newPassword: forgotData.newPassword,
+    });
+    setLoading(false);
+
+    if (!result?.ok) {
+      setError(result?.error || 'Could not reset password.');
+      return;
+    }
+
+    setSuccess(result?.message || 'Password reset successful.');
+    setShowForgotPassword(false);
+    setForgotStep('request');
+    setForgotData({ email: forgotData.email.trim(), code: '', newPassword: '' });
+    setLoginData((prev) => ({ ...prev, email: forgotData.email.trim(), password: '' }));
   }
 
   async function requestVerificationCode(e) {
@@ -133,13 +223,13 @@ export default function AuthPage({ clubs = [], onLogin, onRequestVerification, o
         <section className="rounded-2xl border border-slate-200 p-5">
           <div className="mb-4 flex gap-2">
             <button
-              onClick={() => { setTab('login'); setError(''); setSuccess(''); }}
+              onClick={() => { setTab('login'); setShowForgotPassword(false); setError(''); setSuccess(''); }}
               className={`rounded-full px-4 py-2 text-sm font-bold ${tab === 'login' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
             >
               Login
             </button>
             <button
-              onClick={() => { setTab('register'); setError(''); setSuccess(''); }}
+              onClick={() => { setTab('register'); setShowForgotPassword(false); setError(''); setSuccess(''); }}
               className={`rounded-full px-4 py-2 text-sm font-bold ${tab === 'register' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
             >
               Register
@@ -147,52 +237,154 @@ export default function AuthPage({ clubs = [], onLogin, onRequestVerification, o
           </div>
 
           {tab === 'login' ? (
-            <form onSubmit={submitLogin} className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm font-bold text-slate-700">Email or Username</label>
-                <input
-                  type="text"
-                  required
-                  autoComplete="username"
-                  value={loginData.email}
-                  onChange={(e) => setLoginData((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder={`${CUET_EMAIL_HINT} or admin`}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
-              </div>
+            <>
+              <form onSubmit={submitLogin} className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-slate-700">Email or Username</label>
+                  <input
+                    type="text"
+                    required
+                    autoComplete="username"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData((prev) => ({ ...prev, email: autoCompleteCuetEmail(e.target.value) }))}
+                    onBlur={() => setLoginData((prev) => ({ ...prev, email: finalizeCuetEmail(prev.email) }))}
+                    placeholder={`${CUET_EMAIL_HINT} or admin`}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  />
+                  <p className="mt-1 text-xs text-slate-500">Tip: type only the 7 digits (for example 1000001) and we auto-complete your CUET email.</p>
+                </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-bold text-slate-700">Password</label>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  value={loginData.password}
-                  onChange={(e) => setLoginData((prev) => ({ ...prev, password: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
-              </div>
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-slate-700">Password</label>
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={loginData.password}
+                    onChange={(e) => setLoginData((prev) => ({ ...prev, password: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                  />
+                </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={loginData.remember}
-                  onChange={(e) => setLoginData((prev) => ({ ...prev, remember: e.target.checked }))}
-                />
-                Keep me logged in on this browser
-              </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={loginData.remember}
+                    onChange={(e) => setLoginData((prev) => ({ ...prev, remember: e.target.checked }))}
+                  />
+                  Keep me logged in on this browser
+                </label>
 
-              {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
-              {success && <p className="text-sm font-semibold text-emerald-700">{success}</p>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setSuccess('');
+                    setShowForgotPassword((prev) => !prev);
+                    setForgotStep('request');
+                    setForgotData((prev) => ({ ...prev, email: loginData.email.trim() || prev.email, code: '', newPassword: '' }));
+                  }}
+                  className="text-left text-sm font-bold text-orange-600 hover:text-orange-700"
+                >
+                  Forgot password?
+                </button>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-lg bg-orange-500 px-4 py-2 font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
-              >
-                {loading ? 'Logging in...' : 'Login'}
-              </button>
-            </form>
+                {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
+                {success && <p className="text-sm font-semibold text-emerald-700">{success}</p>}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-orange-500 px-4 py-2 font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
+                >
+                  {loading ? 'Logging in...' : 'Login'}
+                </button>
+              </form>
+
+              {showForgotPassword && (
+                <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4">
+                  <h3 className="text-sm font-black uppercase tracking-[0.08em] text-orange-800">Reset Password</h3>
+
+                  {forgotStep === 'request' ? (
+                    <form onSubmit={requestForgotPasswordCode} className="mt-3 space-y-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-slate-700">Account Email</label>
+                        <input
+                          type="text"
+                          required
+                          value={forgotData.email}
+                          onChange={(e) => setForgotData((prev) => ({ ...prev, email: autoCompleteCuetEmail(e.target.value) }))}
+                          onBlur={() => setForgotData((prev) => ({ ...prev, email: finalizeCuetEmail(prev.email) }))}
+                          placeholder={CUET_EMAIL_HINT}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full rounded-lg bg-slate-900 px-4 py-2 font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {loading ? 'Sending...' : 'Send Reset Code'}
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={submitForgotPasswordReset} className="mt-3 space-y-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-slate-700">Account Email</label>
+                        <input
+                          type="text"
+                          required
+                          value={forgotData.email}
+                          onChange={(e) => setForgotData((prev) => ({ ...prev, email: autoCompleteCuetEmail(e.target.value) }))}
+                          onBlur={() => setForgotData((prev) => ({ ...prev, email: finalizeCuetEmail(prev.email) }))}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-slate-700">Reset Code</label>
+                        <input
+                          type="text"
+                          required
+                          value={forgotData.code}
+                          onChange={(e) => setForgotData((prev) => ({ ...prev, code: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-slate-700">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={forgotData.newPassword}
+                          onChange={(e) => setForgotData((prev) => ({ ...prev, newPassword: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setForgotStep('request')}
+                          className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-bold text-slate-700"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="rounded-lg bg-orange-500 px-4 py-2 font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
+                        >
+                          {loading ? 'Resetting...' : 'Reset Password'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+            </>
           ) : (
             <>
               {registerStep === 'form' ? (
@@ -211,14 +403,16 @@ export default function AuthPage({ clubs = [], onLogin, onRequestVerification, o
                   <div>
                     <label className="mb-1 block text-sm font-bold text-slate-700">CUET Student Email</label>
                     <input
-                      type="email"
+                      type="text"
                       required
                       autoComplete="username"
                       value={registerData.email}
-                      onChange={(e) => setRegisterData((prev) => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) => setRegisterData((prev) => ({ ...prev, email: autoCompleteCuetEmail(e.target.value) }))}
+                      onBlur={() => setRegisterData((prev) => ({ ...prev, email: finalizeCuetEmail(prev.email) }))}
                       placeholder={CUET_EMAIL_HINT}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2"
                     />
+                    <p className="mt-1 text-xs text-slate-500">Enter 7 digits or start with u; the domain is filled automatically.</p>
                   </div>
 
                   <div>

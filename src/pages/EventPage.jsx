@@ -14,6 +14,7 @@ export default function EventPage({
   const [query, setQuery] = useState('');
   const [clubFilter, setClubFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
+  const [showPastEvents, setShowPastEvents] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
 
@@ -27,20 +28,39 @@ export default function EventPage({
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
+  const hasUpcomingEvents = useMemo(
+    () => events.some((event) => event.date >= todayKey),
+    [events, todayKey],
+  );
+
   const filteredEvents = useMemo(() => {
     const q = query.trim().toLowerCase();
     return events.filter((event) => {
-      const dateActive = event.date >= todayKey;
+      const dateActive = showPastEvents || !hasUpcomingEvents || event.date >= todayKey;
       const queryMatch =
         q === '' ||
         event.title.toLowerCase().includes(q) ||
         (event.summary || '').toLowerCase().includes(q) ||
+        (event.details || '').toLowerCase().includes(q) ||
         (event.club || '').toLowerCase().includes(q);
       const clubMatch = clubFilter === 'All' || (event.club || 'Unknown Club') === clubFilter;
       const dateMatch = !dateFilter || event.date === dateFilter;
       return dateActive && queryMatch && clubMatch && dateMatch;
     });
-  }, [events, query, clubFilter, dateFilter, todayKey]);
+  }, [events, query, clubFilter, dateFilter, showPastEvents, hasUpcomingEvents, todayKey]);
+
+  const eventStats = useMemo(() => {
+    const openSlots = filteredEvents.reduce(
+      (sum, event) => sum + Math.max((event.neededVolunteers || 1) - (event.registeredVolunteers || 0), 0),
+      0,
+    );
+
+    return {
+      visible: filteredEvents.length,
+      clubs: new Set(filteredEvents.map((event) => event.club || 'Unknown Club')).size,
+      openSlots,
+    };
+  }, [filteredEvents]);
 
   // Compute the selected event from the current filters and selectedEventId.
   // If there are no filtered events, `selected` will be null so the details
@@ -109,7 +129,7 @@ export default function EventPage({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title, club, or summary"
+            placeholder="Search by title, club, or details"
             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
           />
         </div>
@@ -134,6 +154,28 @@ export default function EventPage({
             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => setShowPastEvents((prev) => !prev)}
+          className={`rounded-xl px-4 py-2 text-sm font-bold ${showPastEvents ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}
+        >
+          {showPastEvents ? 'Showing All Dates' : hasUpcomingEvents ? 'Upcoming Only' : 'No Upcoming (Showing All)'}
+        </button>
+      </div>
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <article className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Visible Events</p>
+          <p className="mt-1 text-2xl font-black text-slate-900">{eventStats.visible}</p>
+        </article>
+        <article className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Clubs in View</p>
+          <p className="mt-1 text-2xl font-black text-slate-900">{eventStats.clubs}</p>
+        </article>
+        <article className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Open Slots</p>
+          <p className="mt-1 text-2xl font-black text-slate-900">{eventStats.openSlots}</p>
+        </article>
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">{error}</p>}
@@ -162,13 +204,29 @@ export default function EventPage({
               );
             })}
             {filteredEvents.length === 0 && (
-              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No events match your filter.</p>
+              <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                <p>No events match your current filters.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      setClubFilter('All');
+                      setDateFilter('');
+                      setShowPastEvents(true);
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </section>
 
         <section
-          className="relative overflow-hidden rounded-2xl border border-amber-100 p-5 lg:col-span-2"
+          className="relative min-h-[26rem] overflow-hidden rounded-2xl border border-amber-100 p-5 lg:col-span-2"
           style={
             (selected?.imageUrl || selected?.image_url)
               ? {
@@ -181,15 +239,26 @@ export default function EventPage({
           }
         >
           {!selected ? (
-            <p className="text-slate-600">Select an event to view details.</p>
+            <div className="space-y-3">
+              <h2 className="text-2xl font-black text-slate-900">No Event Selected</h2>
+              <p className="text-slate-600">Choose an event from the left list to view full details, volunteer slots, and apply status.</p>
+              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                Tip: if the list is empty, use "Reset Filters" and enable all dates to include past events.
+              </div>
+            </div>
           ) : (
             <>
               {(() => {
                 const selectedApplication = getApplicationForEvent(selected.id);
                 return (
-                  <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                     {currentUser && selectedApplication && <StatusBadge status={selectedApplication.status} />}
-                    <p className="text-sm text-slate-600">{selected.date} • {selected.location}</p>
+                      <p className="text-sm text-slate-600">{selected.date} • {selected.location}</p>
+                    </div>
+                    <p className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-white">
+                      {selected.registeredVolunteers || 0}/{selected.neededVolunteers || 1} Volunteers
+                    </p>
                   </div>
                 );
               })()}
@@ -199,7 +268,6 @@ export default function EventPage({
               {selected.createdByEmail && (
                 <p className="mt-2 text-sm text-slate-600">Contact creator: <span className="font-semibold">{selected.createdByEmail}</span></p>
               )}
-              <p className="mt-2 text-sm text-slate-600">Volunteer slots: {selected.registeredVolunteers || 0}/{selected.neededVolunteers || 1}</p>
               <div className="mt-4 rounded-xl bg-white/80 p-4 text-sm leading-relaxed text-slate-800 backdrop-blur-[1px]">
                 {selected.details || 'No additional details provided.'}
               </div>
@@ -208,6 +276,7 @@ export default function EventPage({
                 {(() => {
                   const selectedApplication = getApplicationForEvent(selected.id);
                   const canCancel = selectedApplication?.status === 'Applied';
+                  const shouldHideShare = Boolean(selectedApplication);
                   const isFull = (selected.registeredVolunteers || 0) >= (selected.neededVolunteers || 1);
                   const shouldDisableApply =
                     working ||
@@ -233,16 +302,18 @@ export default function EventPage({
                           Cancel Application
                         </button>
                       )}
+
+                      {!shouldHideShare && (
+                        <button
+                          onClick={() => setOpenShareFor(openShareFor === selected.id ? null : selected.id)}
+                          className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700"
+                        >
+                          Share
+                        </button>
+                      )}
                     </>
                   );
                 })()}
-
-                <button
-                  onClick={() => setOpenShareFor(openShareFor === selected.id ? null : selected.id)}
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700"
-                >
-                  Share
-                </button>
               </div>
 
               {openShareFor === selected.id && (

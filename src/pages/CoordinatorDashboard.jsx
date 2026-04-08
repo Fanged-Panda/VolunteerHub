@@ -9,7 +9,6 @@ const blankForm = {
   neededVolunteers: '',
   imageUrl: '',
   category: '',
-  summary: '',
   details: '',
 };
 
@@ -19,6 +18,8 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState('');
   const [assignmentDrafts, setAssignmentDrafts] = useState({});
+  const [applicantQuery, setApplicantQuery] = useState('');
+  const [applicantFilter, setApplicantFilter] = useState('All');
 
   const isApproved = Boolean(currentUser?.coordinatorApproved);
 
@@ -26,6 +27,29 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
     () => applications.filter((application) => application.status !== 'Rejected'),
     [applications],
   );
+
+  const applicantStats = useMemo(() => {
+    const applied = visibleApplicants.filter((application) => application.status === 'Applied').length;
+    const approved = visibleApplicants.filter((application) => application.status === 'Approved').length;
+    return {
+      all: visibleApplicants.length,
+      applied,
+      approved,
+    };
+  }, [visibleApplicants]);
+
+  const filteredApplicants = useMemo(() => {
+    const q = applicantQuery.trim().toLowerCase();
+    return visibleApplicants.filter((application) => {
+      const filterMatch = applicantFilter === 'All' || application.status === applicantFilter;
+      const queryMatch =
+        !q ||
+        String(application.volunteerName || '').toLowerCase().includes(q) ||
+        String(application.volunteerEmail || '').toLowerCase().includes(q) ||
+        String(application.eventTitle || '').toLowerCase().includes(q);
+      return filterMatch && queryMatch;
+    });
+  }, [visibleApplicants, applicantFilter, applicantQuery]);
 
   const todayKey = useMemo(() => {
     const today = new Date();
@@ -91,7 +115,6 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
       neededVolunteers: Number(event.needed_volunteers || event.neededVolunteers || 1),
       imageUrl: event.image_url || event.imageUrl || '',
       category: event.category || '',
-      summary: event.summary || '',
       details: event.details || '',
     });
     setErrors({});
@@ -252,16 +275,6 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-bold text-slate-700">Summary</label>
-              <textarea
-                value={form.summary}
-                onChange={(e) => setForm((prev) => ({ ...prev, summary: e.target.value }))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                rows={2}
-                disabled={!isApproved || saving}
-              />
-            </div>
-            <div>
               <label className="mb-1 block text-sm font-bold text-slate-700">Details</label>
               <textarea
                 value={form.details}
@@ -283,19 +296,43 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
         </section>
 
         <section className="rounded-2xl border border-amber-100 bg-white p-5">
-          <h2 className="mb-4 text-xl font-black text-slate-900">Manage Applicants</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-black text-slate-900">Manage Applicants</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {[['All', applicantStats.all], ['Applied', applicantStats.applied], ['Approved', applicantStats.approved]].map(([label, count]) => (
+                <button
+                  key={label}
+                  onClick={() => setApplicantFilter(label)}
+                  className={`rounded-full px-3 py-1 text-xs font-bold ${applicantFilter === label ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <input
+              value={applicantQuery}
+              onChange={(e) => setApplicantQuery(e.target.value)}
+              placeholder="Search by volunteer or event"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
           <div className="space-y-3">
-            {visibleApplicants.length === 0 && (
+            {filteredApplicants.length === 0 && (
               <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-                No active applicants for your events.
+                No applicants found for this filter.
               </p>
             )}
 
-            {visibleApplicants.map((application) => (
+            {filteredApplicants.map((application) => (
               <div key={application.id} className="rounded-xl border border-slate-200 p-4">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-black text-slate-900">{application.volunteerName}</p>
+                    <p className="text-xs text-slate-500">{application.volunteerEmail}</p>
                     <p className="text-sm text-slate-600">{application.eventTitle}</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -326,7 +363,7 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
                 )}
 
                 {application.status === 'Approved' && isApproved && (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                     <input
                       value={assignmentDrafts[application.id] ?? ''}
                       onChange={(e) => {
@@ -342,6 +379,12 @@ export default function CoordinatorDashboard({ currentUser, myEvents = [], appli
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Type task and press Enter"
                     />
+                    <button
+                      onClick={() => updateAssignment(application)}
+                      className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white"
+                    >
+                      Add Task
+                    </button>
                     <button
                       onClick={() => toggleAttendance(application)}
                       className={`rounded-lg px-3 py-2 text-sm font-bold ${application.attendance ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-900 text-white'}`}
