@@ -93,7 +93,6 @@ export default function EventPage({
     return {
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
       whatsapp: `https://wa.me/?text=${text}%20${url}`,
-      messenger: `https://www.messenger.com/new?link=${url}`,
     };
   }
 
@@ -230,12 +229,12 @@ export default function EventPage({
           style={
             (selected?.imageUrl || selected?.image_url)
               ? {
-                  backgroundImage: `linear-gradient(rgba(255,255,255,0.88), rgba(255,255,255,0.92)), url(${selected.imageUrl || selected.image_url})`,
+                  backgroundImage: `var(--vh-event-detail-overlay), url(${selected.imageUrl || selected.image_url})`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
                 }
-              : { backgroundColor: '#ffffff' }
+              : { backgroundColor: 'var(--vh-event-detail-fallback)' }
           }
         >
           {!selected ? (
@@ -268,7 +267,7 @@ export default function EventPage({
               {selected.createdByEmail && (
                 <p className="mt-2 text-sm text-slate-600">Contact creator: <span className="font-semibold">{selected.createdByEmail}</span></p>
               )}
-              <div className="mt-4 rounded-xl bg-white/80 p-4 text-sm leading-relaxed text-slate-800 backdrop-blur-[1px]">
+              <div className="mt-4 rounded-xl border border-orange-300 bg-white/80 p-4 text-sm leading-relaxed text-slate-800 backdrop-blur-[1px]">
                 {selected.details || 'No additional details provided.'}
               </div>
 
@@ -322,9 +321,28 @@ export default function EventPage({
                     const links = getShareLinks(selected);
                     return (
                       <>
-                        <a className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white" href={links.facebook} target="_blank" rel="noreferrer">Facebook</a>
-                        <a className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white" href={links.whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>
-                        <a className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white" href={links.messenger} target="_blank" rel="noreferrer">Messenger</a>
+                        <a
+                          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white"
+                          href={links.facebook}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="currentColor">
+                            <path d="M13.5 8.5V6.9c0-.8.5-.9.9-.9h2.1V2.5h-2.9C9.8 2.5 9 5 9 6.7v1.8H6.5V12H9v9.5h4.5V12h2.8l.4-3.5h-3.2z" />
+                          </svg>
+                          
+                        </a>
+                        <a
+                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white"
+                          href={links.whatsapp}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <svg viewBox="0 0 32 32" className="h-4 w-4" aria-hidden="true" fill="currentColor">
+                            <path d="M16.02 3.2C9.23 3.2 3.73 8.7 3.73 15.5c0 2.2.58 4.34 1.69 6.23L3.2 28.8l7.28-2.18a12.26 12.26 0 0 0 5.54 1.33h.01c6.79 0 12.29-5.5 12.29-12.29 0-3.29-1.28-6.37-3.62-8.69A12.2 12.2 0 0 0 16.02 3.2zm0 22.64h-.01a10.2 10.2 0 0 1-5.19-1.42l-.37-.22-4.32 1.29 1.3-4.2-.24-.4a10.23 10.23 0 0 1-1.56-5.39c0-5.66 4.6-10.26 10.27-10.26a10.2 10.2 0 0 1 7.26 3 10.2 10.2 0 0 1 3 7.26c0 5.66-4.6 10.26-10.26 10.26zm5.63-7.68c-.31-.16-1.84-.91-2.13-1.01-.28-.1-.49-.16-.69.16-.2.31-.79 1.01-.96 1.22-.18.2-.35.23-.66.08-.31-.16-1.3-.48-2.47-1.52-.91-.81-1.52-1.8-1.7-2.11-.18-.31-.02-.47.13-.63.14-.13.31-.35.47-.53.16-.18.21-.31.31-.51.1-.2.05-.39-.03-.55-.08-.16-.69-1.67-.95-2.29-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.52.08-.8.39-.27.31-1.04 1.02-1.04 2.49 0 1.47 1.07 2.88 1.22 3.08.16.2 2.1 3.2 5.08 4.48.71.31 1.26.49 1.69.62.71.23 1.35.2 1.86.12.57-.08 1.84-.75 2.1-1.47.26-.72.26-1.33.18-1.47-.08-.12-.28-.2-.59-.35z" />
+                          </svg>
+                          
+                        </a>
                       </>
                     );
                   })()}

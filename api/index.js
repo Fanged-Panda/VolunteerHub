@@ -22,7 +22,8 @@ const CLUBS = [
   'RMA',
   'CUET MUN',
 ];
-const CUET_STUDENT_EMAIL = /^u\d+@student\.cuet\.ac\.bd$/i;
+const CUET_STUDENT_EMAIL = /^(u\d+|admin)@student\.cuet\.ac\.bd$/i;
+const PRIMARY_ADMIN_EMAIL = 'admin@student.cuet.ac.bd';
 
 const app = express();
 
@@ -48,7 +49,8 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
 function createToken(user, remember = false) {
   return jwt.sign(
@@ -96,6 +98,39 @@ function roleRequired(...roles) {
     }
     next();
   };
+}
+
+function parseAssignedTasks(rawValue) {
+  try {
+    const parsed = JSON.parse(rawValue || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeAssignedTasks(rawTasks, fallbackCompleted = false) {
+  if (!Array.isArray(rawTasks)) return [];
+
+  return rawTasks
+    .map((task) => {
+      if (task && typeof task === 'object') {
+        const title = String(task.title ?? task.task ?? '').trim();
+        if (!title) return null;
+        return {
+          title,
+          completed: Boolean(task.completed),
+        };
+      }
+
+      const title = String(task || '').trim();
+      if (!title) return null;
+      return {
+        title,
+        completed: Boolean(fallbackCompleted),
+      };
+    })
+    .filter(Boolean);
 }
 
 function summarizeRoleMix(usersByRole) {
@@ -196,8 +231,17 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/meta/clubs', (req, res) => {
-  res.json({ clubs: CLUBS });
+app.get('/api/meta/clubs', async (req, res) => {
+  const coordinatorRows = await db.all(
+    "SELECT club FROM users WHERE role = 'coordinator' AND club IS NOT NULL AND TRIM(club) <> ''",
+  );
+  const usedClubs = new Set(coordinatorRows.map((row) => row.club));
+  const availableCoordinatorClubs = CLUBS.filter((club) => !usedClubs.has(club));
+
+  res.json({
+    clubs: CLUBS,
+    availableCoordinatorClubs,
+  });
 });
 
 app.post('/api/auth/request-verification', async (req, res) => {
@@ -240,6 +284,9 @@ app.post('/api/auth/forgot-password/request', async (req, res) => {
     if (!CUET_STUDENT_EMAIL.test(normalizedEmail)) {
       return res.status(400).json({ error: "Use your CUET student email (uXXXXXXXX@student.cuet.ac.bd)." });
     }
+    if (normalizedEmail === PRIMARY_ADMIN_EMAIL) {
+      return res.status(400).json({ error: 'Password reset is disabled for the admin account.' });
+    }
 
     const user = await db.get('SELECT id FROM users WHERE email = ?', normalizedEmail);
     if (user) {
@@ -272,6 +319,9 @@ app.post('/api/auth/forgot-password/reset', async (req, res) => {
 
     if (!CUET_STUDENT_EMAIL.test(normalizedEmail)) {
       return res.status(400).json({ error: "Use your CUET student email (uXXXXXXXX@student.cuet.ac.bd)." });
+    }
+    if (normalizedEmail === PRIMARY_ADMIN_EMAIL) {
+      return res.status(400).json({ error: 'Password reset is disabled for the admin account.' });
     }
     if (!normalizedCode) {
       return res.status(400).json({ error: 'Reset code is required.' });
@@ -386,10 +436,12 @@ async function handleLogin(req, res) {
     const { email, username, password, remember } = req.body || {};
     const identifier = String(email || username || '').trim().toLowerCase();
 
-    const user = identifier === 'admin'
-      ? await db.get("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")
-      : await db.get('SELECT * FROM users WHERE email = ?', identifier);
+    const user = await db.get('SELECT * FROM users WHERE email = ?', identifier);
     if (!user) return res.status(401).json({ error: 'Invalid email or password.' });
+
+    if (user.role === 'admin' && String(user.email || '').toLowerCase() !== PRIMARY_ADMIN_EMAIL) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
 
     const valid = await bcrypt.compare(password || '', user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid email or password.' });
@@ -418,7 +470,8 @@ app.get('/api/auth/me', authRequired, async (req, res) => {
 app.get('/api/events', async (req, res) => {
   const rows = await db.all(
     `SELECT e.id, e.title, e.date, e.location, e.club, e.needed_volunteers AS neededVolunteers,
-            e.image_url AS imageUrl, e.category, e.summary, e.details,
+            e.image_url AS imageUrl, e.details,
+            e.created_by AS createdBy, e.created_at AS createdAt,
             u.email AS createdByEmail,
             (
               SELECT COUNT(*)
@@ -438,30 +491,46 @@ app.post('/api/events', authRequired, roleRequired('coordinator'), async (req, r
     return res.status(403).json({ error: 'Coordinator account is waiting for admin approval.' });
   }
 
-  const { title, date, location, neededVolunteers, imageUrl, category, summary, details } = req.body || {};
+  const {
+    title,
+    date,
+    location,
+    club,
+    needed_volunteers: neededVolunteersFromSchema,
+    neededVolunteers,
+    image_url: imageUrlFromSchema,
+    imageUrl,
+    details,
+    created_by: createdByFromSchema,
+  } = req.body || {};
   if (!title || !date || !location) {
     return res.status(400).json({ error: 'Title, date, and location are required.' });
   }
-  const needed = Number(neededVolunteers);
-  if (!Number.isInteger(needed) || needed < 1) {
-    return res.status(400).json({ error: 'Volunteers needed must be at least 1.' });
-  }
+
+  const neededRaw = neededVolunteersFromSchema ?? neededVolunteers;
+  const parsedNeeded = Number(neededRaw);
+  const needed = Number.isInteger(parsedNeeded) && parsedNeeded > 0 ? parsedNeeded : 1;
+
+  const resolvedClub = String(club ?? owner.club ?? '').trim();
+  const resolvedImageUrl = String(imageUrlFromSchema ?? imageUrl ?? '').trim() || null;
+  const resolvedDetails = String(details ?? '').trim() || null;
+  const parsedCreatedBy = Number(createdByFromSchema);
+  const resolvedCreatedBy = Number.isInteger(parsedCreatedBy)
+    ? parsedCreatedBy
+    : (owner?.id ?? null);
 
   const result = await db.run(
-    `INSERT INTO events (title, date, location, club, needed_volunteers, image_url, category, summary, details, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO events (title, date, location, club, needed_volunteers, image_url, details, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       String(title).trim(),
       String(date).trim(),
       String(location).trim(),
-      owner.club,
+      resolvedClub,
       needed,
-      imageUrl ? String(imageUrl).trim() : '',
-      category ? String(category).trim() : '',
-      summary ? String(summary).trim() : '',
-      details ? String(details).trim() : '',
-      owner.id,
-      new Date().toISOString(),
+      resolvedImageUrl,
+      resolvedDetails,
+      resolvedCreatedBy,
     ],
   );
 
@@ -479,28 +548,36 @@ app.put('/api/events/:id', authRequired, roleRequired('coordinator'), async (req
   if (!event) return res.status(404).json({ error: 'Event not found.' });
   if (event.created_by !== owner.id) return res.status(403).json({ error: 'You can edit only your events.' });
 
-  const { title, date, location, neededVolunteers, imageUrl, category, summary, details } = req.body || {};
+  const {
+    title,
+    date,
+    location,
+    needed_volunteers: neededVolunteersFromSchema,
+    neededVolunteers,
+    image_url: imageUrlFromSchema,
+    imageUrl,
+    details,
+  } = req.body || {};
   if (!title || !date || !location) {
     return res.status(400).json({ error: 'Title, date, and location are required.' });
   }
-  const needed = Number(neededVolunteers);
+  const neededRaw = neededVolunteersFromSchema ?? neededVolunteers;
+  const needed = Number(neededRaw);
   if (!Number.isInteger(needed) || needed < 1) {
     return res.status(400).json({ error: 'Volunteers needed must be at least 1.' });
   }
 
   await db.run(
     `UPDATE events
-     SET title = ?, date = ?, location = ?, needed_volunteers = ?, image_url = ?, category = ?, summary = ?, details = ?
+     SET title = ?, date = ?, location = ?, needed_volunteers = ?, image_url = ?, details = ?
      WHERE id = ?`,
     [
       String(title).trim(),
       String(date).trim(),
       String(location).trim(),
       needed,
-      imageUrl ? String(imageUrl).trim() : '',
-      category ? String(category).trim() : '',
-      summary ? String(summary).trim() : '',
-      details ? String(details).trim() : '',
+      String(imageUrlFromSchema ?? imageUrl ?? '').trim() || null,
+      String(details ?? '').trim() || null,
       event.id,
     ],
   );
@@ -581,22 +658,66 @@ app.get('/api/applications/my', authRequired, roleRequired('volunteer'), async (
   );
   res.json({
     applications: rows.map((row) => ({
-      ...row,
-      assignedTasks: JSON.parse(row.assignedTasks || '[]'),
-      attendance: Boolean(row.attendance),
-      taskCompleted: Boolean(row.taskCompleted),
+      ...(() => {
+        const normalizedTasks = normalizeAssignedTasks(
+          parseAssignedTasks(row.assignedTasks),
+          Boolean(row.taskCompleted),
+        );
+        const completedTaskCount = normalizedTasks.filter((task) => task.completed).length;
+        const allTasksCompleted = normalizedTasks.length > 0 && completedTaskCount === normalizedTasks.length;
+
+        return {
+          ...row,
+          assignedTask: normalizedTasks.length
+            ? normalizedTasks[normalizedTasks.length - 1].title
+            : row.assignedTask,
+          assignedTasks: normalizedTasks,
+          completedTaskCount,
+          totalTaskCount: normalizedTasks.length,
+          attendance: Boolean(row.attendance),
+          taskCompleted: normalizedTasks.length ? allTasksCompleted : Boolean(row.taskCompleted),
+        };
+      })(),
     })),
   });
 });
 
 app.patch('/api/applications/:id/task-completion', authRequired, roleRequired('volunteer'), async (req, res) => {
   const id = Number(req.params.id);
-  const { taskCompleted } = req.body || {};
+  const { taskCompleted, taskIndex } = req.body || {};
   const application = await db.get('SELECT * FROM applications WHERE id = ? AND volunteer_id = ?', [id, req.user.id]);
   if (!application) return res.status(404).json({ error: 'Application not found.' });
   if (application.status !== 'Approved') return res.status(400).json({ error: 'Only approved tasks can be updated.' });
 
-  await db.run('UPDATE applications SET task_completed = ? WHERE id = ?', [taskCompleted ? 1 : 0, id]);
+  let nextTasks = normalizeAssignedTasks(
+    parseAssignedTasks(application.assigned_tasks),
+    Boolean(application.task_completed),
+  );
+
+  const hasTaskIndex = taskIndex !== undefined && taskIndex !== null && String(taskIndex).trim() !== '';
+  const parsedTaskIndex = Number(taskIndex);
+
+  if (nextTasks.length > 0) {
+    if (!hasTaskIndex || !Number.isInteger(parsedTaskIndex) || parsedTaskIndex < 0 || parsedTaskIndex >= nextTasks.length) {
+      return res.status(400).json({ error: 'A valid task index is required.' });
+    }
+
+    nextTasks[parsedTaskIndex] = {
+      ...nextTasks[parsedTaskIndex],
+      completed: Boolean(taskCompleted),
+    };
+  }
+
+  const overallCompleted = nextTasks.length
+    ? nextTasks.every((task) => task.completed)
+    : Boolean(taskCompleted);
+
+  await db.run('UPDATE applications SET assigned_tasks = ?, task_completed = ? WHERE id = ?', [
+    JSON.stringify(nextTasks),
+    overallCompleted ? 1 : 0,
+    id,
+  ]);
+
   res.json({ ok: true });
 });
 
@@ -626,10 +747,26 @@ app.get('/api/coordinator/applications', authRequired, roleRequired('coordinator
   res.json({
     approved: Boolean(owner.coordinator_approved),
     applications: rows.map((row) => ({
-      ...row,
-      assignedTasks: JSON.parse(row.assignedTasks || '[]'),
-      attendance: Boolean(row.attendance),
-      taskCompleted: Boolean(row.taskCompleted),
+      ...(() => {
+        const normalizedTasks = normalizeAssignedTasks(
+          parseAssignedTasks(row.assignedTasks),
+          Boolean(row.taskCompleted),
+        );
+        const completedTaskCount = normalizedTasks.filter((task) => task.completed).length;
+        const allTasksCompleted = normalizedTasks.length > 0 && completedTaskCount === normalizedTasks.length;
+
+        return {
+          ...row,
+          assignedTask: normalizedTasks.length
+            ? normalizedTasks[normalizedTasks.length - 1].title
+            : row.assignedTask,
+          assignedTasks: normalizedTasks,
+          completedTaskCount,
+          totalTaskCount: normalizedTasks.length,
+          attendance: Boolean(row.attendance),
+          taskCompleted: normalizedTasks.length ? allTasksCompleted : Boolean(row.taskCompleted),
+        };
+      })(),
     })),
   });
 });
@@ -677,7 +814,7 @@ app.patch('/api/applications/:id/assignment', authRequired, roleRequired('coordi
 
   const { addTask, attendance } = req.body || {};
   const row = await db.get(
-    `SELECT a.id, a.status, a.assigned_tasks AS assignedTasks, e.created_by
+    `SELECT a.id, a.status, a.assigned_tasks AS assignedTasks, a.task_completed AS taskCompleted, e.created_by
      FROM applications a
      JOIN events e ON e.id = a.event_id
      WHERE a.id = ?`,
@@ -687,25 +824,28 @@ app.patch('/api/applications/:id/assignment', authRequired, roleRequired('coordi
   if (row.created_by !== owner.id) return res.status(403).json({ error: 'Forbidden' });
   if (row.status !== 'Approved') return res.status(400).json({ error: 'Only approved applicants can be assigned.' });
 
-  let nextTasks = JSON.parse(row.assignedTasks || '[]');
-  if (!Array.isArray(nextTasks)) nextTasks = [];
+  let nextTasks = normalizeAssignedTasks(parseAssignedTasks(row.assignedTasks), Boolean(row.taskCompleted));
 
   if (addTask && String(addTask).trim()) {
-    nextTasks.push(String(addTask).trim());
+    nextTasks.push({
+      title: String(addTask).trim(),
+      completed: false,
+    });
   }
 
   const nextAttendance = typeof attendance === 'boolean' ? (attendance ? 1 : 0) : undefined;
-  const lastTask = nextTasks.length ? nextTasks[nextTasks.length - 1] : '';
+  const lastTask = nextTasks.length ? nextTasks[nextTasks.length - 1].title : '';
+  const overallCompleted = nextTasks.length ? nextTasks.every((task) => task.completed) : false;
 
   if (typeof nextAttendance === 'number') {
     await db.run(
-      'UPDATE applications SET assigned_task = ?, assigned_tasks = ?, attendance = ? WHERE id = ?',
-      [lastTask, JSON.stringify(nextTasks), nextAttendance, row.id],
+      'UPDATE applications SET assigned_task = ?, assigned_tasks = ?, attendance = ?, task_completed = ? WHERE id = ?',
+      [lastTask, JSON.stringify(nextTasks), nextAttendance, overallCompleted ? 1 : 0, row.id],
     );
   } else {
     await db.run(
-      'UPDATE applications SET assigned_task = ?, assigned_tasks = ? WHERE id = ?',
-      [lastTask, JSON.stringify(nextTasks), row.id],
+      'UPDATE applications SET assigned_task = ?, assigned_tasks = ?, task_completed = ? WHERE id = ?',
+      [lastTask, JSON.stringify(nextTasks), overallCompleted ? 1 : 0, row.id],
     );
   }
 
@@ -750,12 +890,28 @@ app.patch('/api/admin/users/:id/approve-coordinator', authRequired, roleRequired
   res.json({ ok: true });
 });
 
+app.delete('/api/admin/users/:id/reject-coordinator', authRequired, roleRequired('admin'), async (req, res) => {
+  const id = Number(req.params.id);
+  const user = await db.get('SELECT * FROM users WHERE id = ?', id);
+  if (!user) return res.status(404).json({ error: 'User not found.' });
+  if (user.role !== 'coordinator') return res.status(400).json({ error: 'User is not a coordinator.' });
+  if (user.coordinator_approved) {
+    return res.status(400).json({ error: 'Coordinator is already approved.' });
+  }
+
+  await db.run('DELETE FROM users WHERE id = ?', id);
+  res.json({ ok: true });
+});
+
 app.delete('/api/admin/users/:id', authRequired, roleRequired('admin'), async (req, res) => {
   const id = Number(req.params.id);
   if (id === req.user.id) return res.status(400).json({ error: 'You cannot remove your own admin account.' });
 
   const user = await db.get('SELECT * FROM users WHERE id = ?', id);
   if (!user) return res.status(404).json({ error: 'User not found.' });
+  if (String(user.email || '').toLowerCase() === PRIMARY_ADMIN_EMAIL || user.role === 'admin') {
+    return res.status(400).json({ error: 'Admin account cannot be removed.' });
+  }
 
   await db.run('DELETE FROM users WHERE id = ?', id);
   res.json({ ok: true });
@@ -869,5 +1025,14 @@ if (!IS_PRODUCTION) {
     console.log(`VolunteerHub API running on http://localhost:${PORT}`);
   });
 }
+
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: 'Payload too large. Please upload a smaller image.',
+    });
+  }
+  return next(err);
+});
 
 export default app;

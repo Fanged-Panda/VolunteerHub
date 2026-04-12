@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Home from './pages/Home';
+import About from './pages/About';
+import Gallery from './pages/GalleryAlt';
 import VolunteerDashboard from './pages/VolunteerDashboard';
 import EventPage from './pages/EventPage';
 import CoordinatorDashboard from './pages/CoordinatorDashboard';
@@ -9,25 +11,49 @@ import TopNav from './components/TopNav';
 import ChatbotWidget from './components/ChatbotWidget';
 import { apiRequest, clearStoredToken, getStoredToken, setStoredToken } from './lib/api';
 
-const PAGE_SET = new Set(['home', 'events', 'auth', 'volunteer', 'coordinator', 'admin']);
+const PAGE_SET = new Set(['home', 'about', 'gallery', 'events', 'auth', 'login', 'register', 'volunteer', 'coordinator', 'admin']);
+const THEME_STORAGE_KEY = 'vh_theme';
+
+function normalizePathname(pathname) {
+  if (!pathname || pathname === '/') return '/';
+  return pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+}
+
+function readInitialTheme() {
+  const storedTheme = String(localStorage.getItem(THEME_STORAGE_KEY) || '').trim();
+  if (storedTheme === 'day' || storedTheme === 'night') return storedTheme;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'day';
+}
 
 function parseRouteFromLocation() {
+  const pathname = normalizePathname(window.location.pathname);
+  if (pathname === '/about') {
+    return { page: 'about', selectedEventId: null };
+  }
+  if (pathname === '/gallery') {
+    return { page: 'gallery', selectedEventId: null };
+  }
+
   const params = new URLSearchParams(window.location.search);
   const page = params.get('page');
   const selectedEventRaw = params.get('eventId');
   const selectedEventId = selectedEventRaw ? Number(selectedEventRaw) : null;
+  const normalizedPage = page === 'auth' ? 'login' : page;
 
   return {
-    page: PAGE_SET.has(page) ? page : 'home',
+    page: PAGE_SET.has(normalizedPage) ? normalizedPage : 'home',
     selectedEventId: Number.isFinite(selectedEventId) ? selectedEventId : null,
   };
 }
 
 function buildRoute(page, eventId) {
+  if (page === 'about') return '/about';
+  if (page === 'gallery') return '/gallery';
+
   const params = new URLSearchParams();
   params.set('page', page);
   if (eventId) params.set('eventId', String(eventId));
-  return `?${params.toString()}`;
+  return `/?${params.toString()}`;
 }
 
 export default function App() {
@@ -51,6 +77,14 @@ export default function App() {
   const [adminTotalEvents, setAdminTotalEvents] = useState(0);
 
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState(() => readInitialTheme());
+  const [authFormKey, setAuthFormKey] = useState(0);
+
+  const isNight = theme === 'night';
+
+  const appThemeClass = isNight
+    ? 'bg-slate-950 text-slate-100'
+    : 'bg-amber-50 text-slate-900';
 
   function syncRoute(page, eventId, replace = false) {
     const url = buildRoute(page, eventId);
@@ -77,7 +111,7 @@ export default function App() {
 
   function openDashboard() {
     if (!currentUser) {
-      navigateTo('auth');
+      navigateTo('login');
       return;
     }
     if (currentUser.role === 'coordinator') navigateTo('coordinator');
@@ -144,21 +178,39 @@ export default function App() {
   async function bootstrap() {
     setLoading(true);
     try {
-      const clubsData = await apiRequest('/api/meta/clubs', { token: '' });
-      setClubs(clubsData.clubs || []);
-      await refreshEvents();
+      try {
+        const clubsData = await apiRequest('/api/meta/clubs', { token: '' });
+        const allClubs = Array.isArray(clubsData.clubs) ? clubsData.clubs : [];
+        const availableCoordinatorClubs = Array.isArray(clubsData.availableCoordinatorClubs)
+          ? clubsData.availableCoordinatorClubs
+          : allClubs;
+        setClubs(availableCoordinatorClubs);
+      } catch {
+        setClubs([]);
+      }
 
-      if (token) {
+      try {
+        await refreshEvents();
+      } catch {
+        setEvents([]);
+      }
+
+      if (!token) {
+        setCurrentUser(null);
+        await refreshRoleData(null, '');
+        return;
+      }
+
+      try {
         const me = await apiRequest('/api/auth/me', { token });
         setCurrentUser(me.user);
         await refreshRoleData(me.user, token);
-      } else {
+      } catch {
+        clearStoredToken();
+        setToken('');
         setCurrentUser(null);
+        await refreshRoleData(null, '');
       }
-    } catch {
-      clearStoredToken();
-      setToken('');
-      setCurrentUser(null);
     } finally {
       setLoading(false);
     }
@@ -167,6 +219,11 @@ export default function App() {
   useEffect(() => {
     bootstrap();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     syncRoute(currentPage, selectedEventId, true);
@@ -285,6 +342,7 @@ export default function App() {
     setToken('');
     setCurrentUser(null);
     setPostAuthTarget(null);
+    setAuthFormKey((prev) => prev + 1);
     setApplications([]);
     setCoordinatorApplications([]);
     setMyEvents([]);
@@ -296,7 +354,7 @@ export default function App() {
 
   function requireLogin(target) {
     setPostAuthTarget(target);
-    navigateTo('auth');
+    navigateTo('login');
   }
 
   function canAccess(page) {
@@ -371,12 +429,12 @@ export default function App() {
     }
   }
 
-  async function handleVolunteerTaskComplete(applicationId, taskCompleted) {
+  async function handleVolunteerTaskComplete(applicationId, taskIndex, taskCompleted) {
     try {
       await apiRequest(`/api/applications/${applicationId}/task-completion`, {
         method: 'PATCH',
         token,
-        body: { taskCompleted },
+        body: { taskIndex, taskCompleted },
       });
       await refreshRoleData();
       return { ok: true };
@@ -388,6 +446,16 @@ export default function App() {
   async function handleApproveCoordinator(userId) {
     try {
       await apiRequest(`/api/admin/users/${userId}/approve-coordinator`, { method: 'PATCH', token });
+      await refreshRoleData();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  async function handleRejectCoordinator(userId) {
+    try {
+      await apiRequest(`/api/admin/users/${userId}/reject-coordinator`, { method: 'DELETE', token });
       await refreshRoleData();
       return { ok: true };
     } catch (err) {
@@ -417,28 +485,53 @@ export default function App() {
     }
   }
 
+  function toggleTheme() {
+    setTheme((prev) => (prev === 'night' ? 'day' : 'night'));
+  }
+
+  function renderCapsuleLoader() {
+    return (
+      <div className={`vh-loader-screen ${isNight ? 'vh-loader-night' : 'vh-loader-day'}`}>
+        <div className="vh-loader-circle" aria-hidden="true">
+          <div className="vh-loader-capsule" style={{ '--medicineCount': 8 }}>
+            {Array.from({ length: 8 }).map((_, index) => (
+              <i key={index + 1} style={{ '--order': index + 1 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return renderCapsuleLoader();
+  }
+
   return (
-    <div className="min-h-screen bg-amber-50 text-slate-900">
+    <div className={`min-h-screen transition-colors duration-300 ${appThemeClass}`}>
       <TopNav
         currentPage={currentPage}
         navigateTo={navigateTo}
         openDashboard={openDashboard}
         currentUser={currentUser}
-        onLoginClick={() => navigateTo('auth')}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onLoginClick={() => navigateTo('login')}
         onLogout={handleLogout}
       />
-
-      {loading && (
-        <div className="mx-auto max-w-7xl px-4 py-4 text-sm font-semibold text-slate-600">Loading data...</div>
-      )}
 
       {currentPage === 'home' && (
         <Home
           events={events}
           setSelectedEvent={setSelectedEventId}
           openEvents={openEvents}
+          openGallery={() => navigateTo('gallery')}
         />
       )}
+
+      {currentPage === 'about' && <About theme={theme} />}
+
+      {currentPage === 'gallery' && <Gallery theme={theme} />}
 
       {currentPage === 'events' && (
         <EventPage
@@ -453,14 +546,18 @@ export default function App() {
         />
       )}
 
-      {currentPage === 'auth' && (
+      {(currentPage === 'auth' || currentPage === 'login' || currentPage === 'register') && (
         <AuthPage
+          key={`auth-main-${currentPage}-${authFormKey}`}
+          mode={currentPage === 'register' ? 'register' : 'login'}
           clubs={clubs}
           onLogin={handleLogin}
           onRequestVerification={handleRequestVerification}
           onRegister={handleRegister}
           onForgotPasswordRequest={handleForgotPasswordRequest}
           onForgotPasswordReset={handleForgotPasswordReset}
+          onGoLogin={() => navigateTo('login')}
+          onGoRegister={() => navigateTo('register')}
         />
       )}
 
@@ -495,6 +592,7 @@ export default function App() {
           totalUsers={adminTotalUsers}
           totalEvents={adminTotalEvents}
           onApproveCoordinator={handleApproveCoordinator}
+          onRejectCoordinator={handleRejectCoordinator}
           onRemoveUser={handleRemoveUser}
           onRemoveEvent={handleRemoveEvent}
         />
@@ -504,12 +602,16 @@ export default function App() {
         (currentPage === 'coordinator' && !canAccess('coordinator')) ||
         (currentPage === 'admin' && !canAccess('admin'))) && (
         <AuthPage
+          key={`auth-guard-${authFormKey}`}
+          mode="login"
           clubs={clubs}
           onLogin={handleLogin}
           onRequestVerification={handleRequestVerification}
           onRegister={handleRegister}
           onForgotPasswordRequest={handleForgotPasswordRequest}
           onForgotPasswordReset={handleForgotPasswordReset}
+          onGoLogin={() => navigateTo('login')}
+          onGoRegister={() => navigateTo('register')}
         />
       )}
 

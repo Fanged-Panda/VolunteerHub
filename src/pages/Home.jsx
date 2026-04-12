@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import cuetEgg from '../assets/cuet with egg.jpeg';
-import rasel from '../assets/rasel.jpg';
+import asif from '../assets/asif.jpg';
 import tsc from '../assets/tsc.jpg';
-import asrro from '../assets/asrro.jpg';
+import asrro from '../assets/z.jpg';
 import workshop from '../assets/workshop.jpg';
-import pulak from '../assets/pulak.png';
+import pulak from '../assets/pulak.jpg';
 
 const WORKFLOW_STEPS = [
   {
@@ -65,13 +65,13 @@ const IMPACT_QUOTES = [
   },
 ];
 
-export default function Home({ events = [], setSelectedEvent, openEvents }) {
+export default function Home({ events = [], setSelectedEvent, openEvents, openGallery }) {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const slides = useMemo(
     () => [
       { src: cuetEgg, alt: 'CUET iconic building', label: 'CUET with Egg' },
-      { src: rasel, alt: 'Rasel', label: 'Rasel Hall' },
+      { src: asif, alt: 'asif', label: 'computer club reception' },
       { src: tsc, alt: 'TSC cafeteria', label: 'TSC Cafeteria' },
       { src: asrro, alt: 'ASRRO', label: 'ASRRO' },
       { src: workshop, alt: 'ASRRO', label: 'Workshop' },
@@ -88,30 +88,43 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const upcoming = useMemo(() => events.filter((event) => event.date >= todayKey).slice(0, 8), [events, todayKey]);
-  const marqueeEvents = useMemo(() => (upcoming.length ? [...upcoming, ...upcoming] : []), [upcoming]);
-  const spotlightEvents = useMemo(() => upcoming.slice(0, 3), [upcoming]);
-  const timelineEvents = useMemo(() => upcoming.slice(0, 5), [upcoming]);
+  const upcomingEvents = useMemo(() => events.filter((event) => event.date >= todayKey), [events, todayKey]);
+  const hasUpcomingEvents = upcomingEvents.length > 0;
+
+  const activeEvents = useMemo(() => {
+    if (hasUpcomingEvents) return upcomingEvents.slice(0, 8);
+    return [...events]
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .slice(0, 8);
+  }, [events, hasUpcomingEvents, upcomingEvents]);
+
+  const marqueeEvents = useMemo(() => (activeEvents.length ? [...activeEvents, ...activeEvents] : []), [activeEvents]);
+  const spotlightEvents = useMemo(() => activeEvents.slice(0, 3), [activeEvents]);
+  const timelineEvents = useMemo(() => activeEvents.slice(0, 5), [activeEvents]);
 
   const quickStats = useMemo(() => {
-    const activeClubs = new Set(upcoming.map((event) => String(event.club || '').trim()).filter(Boolean)).size;
-    const registered = upcoming.reduce((sum, event) => sum + Number(event.registeredVolunteers || 0), 0);
-    const slots = upcoming.reduce(
+    const activeClubs = new Set(activeEvents.map((event) => String(event.club || '').trim()).filter(Boolean)).size;
+    const registered = activeEvents.reduce((sum, event) => sum + Number(event.registeredVolunteers || 0), 0);
+    const slots = activeEvents.reduce(
       (sum, event) => sum + Number(event.neededVolunteers || event.needed_volunteers || 0),
       0,
     );
 
     return [
-      { label: 'Upcoming Events', value: upcoming.length, hint: 'Live now' },
+      {
+        label: hasUpcomingEvents ? 'Upcoming Events' : 'Recent Events',
+        value: activeEvents.length,
+        hint: hasUpcomingEvents ? 'Live now' : 'Latest listed',
+      },
       { label: 'Active Clubs', value: activeClubs, hint: 'Campus-wide' },
       { label: 'Registered Volunteers', value: registered, hint: 'Current records' },
       { label: 'Open Slots', value: Math.max(slots - registered, 0), hint: 'Still available' },
     ];
-  }, [upcoming]);
+  }, [activeEvents, hasUpcomingEvents]);
 
   const clubMomentum = useMemo(() => {
     const counts = {};
-    upcoming.forEach((event) => {
+    activeEvents.forEach((event) => {
       const club = String(event.club || 'Unknown Club');
       counts[club] = (counts[club] || 0) + 1;
     });
@@ -129,7 +142,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
               ? 'bg-sky-100 text-sky-700'
               : 'bg-emerald-100 text-emerald-700',
       }));
-  }, [upcoming]);
+  }, [activeEvents]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -165,8 +178,8 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
               Official CUET Club Events
             </p>
             <h1 className="text-4xl font-black leading-tight text-slate-900 sm:text-5xl lg:text-6xl">
-              Volunteer for CUET Clubs,
-              <span className="block text-orange-500">Build Impact That Scales</span>
+              Volunteering 
+              <span className="block text-orange-500">Simplified</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
               Discover CUET-only opportunities, apply faster, coordinate better, and track every contribution from one unified platform.
@@ -188,7 +201,10 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-3xl border border-amber-200/80 shadow-2xl">
+          <div
+            className="relative cursor-pointer overflow-hidden rounded-3xl border border-amber-200/80 shadow-2xl"
+            onClick={() => openGallery?.()}
+          >
             {slides.map((slide, index) => (
               <img
                 key={slide.label}
@@ -209,14 +225,20 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={goPrev}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    goPrev();
+                  }}
                   className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
                   aria-label="Previous image"
                 >
                   Prev
                 </button>
                 <button
-                  onClick={goNext}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    goNext();
+                  }}
                   className="rounded-full bg-white/90 px-3 py-2 text-sm font-bold text-slate-900 shadow"
                   aria-label="Next image"
                 >
@@ -229,7 +251,10 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
               {slides.map((slide, index) => (
                 <button
                   key={slide.label + '-dot'}
-                  onClick={() => setActiveSlide(index)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setActiveSlide(index);
+                  }}
                   className={`h-2.5 rounded-full transition-all ${index === activeSlide ? 'w-7 bg-orange-500' : 'w-2.5 bg-white/80'}`}
                   aria-label={`Go to ${slide.label}`}
                 />
@@ -253,11 +278,14 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
 
       <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-900">Upcoming Events</h2>
+          <h2 className="text-2xl font-black text-slate-900">{hasUpcomingEvents ? 'Upcoming Events' : 'Recent Events'}</h2>
+          {!hasUpcomingEvents && events.length > 0 && (
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">No future dates found</p>
+          )}
         </div>
 
-        {upcoming.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No upcoming events available right now.</p>
+        {activeEvents.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No events available right now.</p>
         ) : (
           <div className="vh-marquee">
             <div className="vh-marquee-track">
@@ -311,7 +339,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
       </section>
 
       <section className="relative mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
-        <div className="absolute inset-y-0 right-0 hidden w-2/5 rounded-3xl bg-gradient-to-b from-amber-100/40 to-orange-100/30 lg:block" />
+        {/* <div className="absolute inset-y-0 right-0 hidden w-2/5 rounded-3xl bg-gradient-to-b from-amber-100/40 to-orange-100/30 lg:block" /> */}
         <div className="relative grid gap-6 lg:grid-cols-2">
           <article className="rounded-3xl border border-amber-100 bg-white p-6">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">How It Works</p>
@@ -412,8 +440,8 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
                 className={`relative overflow-hidden rounded-3xl border border-amber-100 p-5 shadow-sm ${index === 0 ? 'lg:col-span-2 lg:min-h-[18rem]' : 'lg:min-h-[18rem]'}`}
                 style={{
                   backgroundImage: event.imageUrl || event.image_url
-                    ? `linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.94)), url(${event.imageUrl || event.image_url})`
-                    : 'linear-gradient(135deg, rgba(255,247,237,0.95), rgba(255,255,255,0.97))',
+                    ? `var(--vh-event-card-overlay), url(${event.imageUrl || event.image_url})`
+                    : 'var(--vh-event-card-fallback)',
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                 }}
@@ -447,15 +475,6 @@ export default function Home({ events = [], setSelectedEvent, openEvents }) {
                 <p className="mt-1 text-[10px] font-bold text-orange-600">Card #{String(index + 1).padStart(2, '0')}</p>
               </article>
             ))}
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={() => openEvents()}
-              className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-orange-600"
-            >
-              Join an Event Today
-            </button>
           </div>
         </div>
       </section>

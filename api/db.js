@@ -12,6 +12,8 @@ const CLUBS = [
   'RMA',
   'CUET MUN',
 ];
+const PRIMARY_ADMIN_EMAIL = 'admin@student.cuet.ac.bd';
+const PRIMARY_ADMIN_PASSWORD = 'admin';
 
 async function ensureColumn(db, table, column, sqlTypeAndDefault) {
   const exists = await db.get(
@@ -23,6 +25,25 @@ async function ensureColumn(db, table, column, sqlTypeAndDefault) {
   );
   if (!exists) {
     await db.exec(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${sqlTypeAndDefault}`);
+  }
+}
+
+async function ensureLongTextColumn(db, table, column) {
+  const meta = await db.get(
+    `SELECT DATA_TYPE AS dataType
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?
+     LIMIT 1`,
+    [db.databaseName, table, column],
+  );
+
+  if (!meta) {
+    await db.exec(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` LONGTEXT NULL`);
+    return;
+  }
+
+  if (String(meta.dataType || '').toLowerCase() !== 'longtext') {
+    await db.exec(`ALTER TABLE \`${table}\` MODIFY COLUMN \`${column}\` LONGTEXT NULL`);
   }
 }
 
@@ -162,6 +183,54 @@ function toMysqlTimestamp() {
   return new Date().toISOString();
 }
 
+async function ensureSinglePrimaryAdmin(db) {
+  const normalizedPrimaryEmail = PRIMARY_ADMIN_EMAIL.toLowerCase();
+  const adminPasswordHash = await bcrypt.hash(PRIMARY_ADMIN_PASSWORD, 10);
+
+  const userWithPrimaryEmail = await db.get(
+    'SELECT id FROM users WHERE email = ? LIMIT 1',
+    normalizedPrimaryEmail,
+  );
+  const existingAdmins = await db.all("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC");
+
+  let primaryAdminId;
+
+  if (userWithPrimaryEmail?.id) {
+    primaryAdminId = userWithPrimaryEmail.id;
+    await db.run(
+      `UPDATE users
+       SET name = ?, role = 'admin', password_hash = ?, coordinator_approved = 1, club = NULL, department = NULL
+       WHERE id = ?`,
+      ['Admin User', adminPasswordHash, primaryAdminId],
+    );
+  } else if (existingAdmins.length > 0) {
+    primaryAdminId = existingAdmins[0].id;
+    await db.run(
+      `UPDATE users
+       SET name = ?, email = ?, role = 'admin', password_hash = ?, coordinator_approved = 1, club = NULL, department = NULL
+       WHERE id = ?`,
+      ['Admin User', normalizedPrimaryEmail, adminPasswordHash, primaryAdminId],
+    );
+  } else {
+    const result = await db.run(
+      'INSERT INTO users (name, email, password_hash, role, club, coordinator_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ['Admin User', normalizedPrimaryEmail, adminPasswordHash, 'admin', null, 1, toMysqlTimestamp()],
+    );
+    primaryAdminId = result.lastID;
+  }
+
+  const extraAdmins = await db.all(
+    "SELECT id FROM users WHERE role = 'admin' AND id != ?",
+    primaryAdminId,
+  );
+
+  if (extraAdmins.length > 0) {
+    const ids = extraAdmins.map((row) => row.id);
+    const placeholders = ids.map(() => '?').join(', ');
+    await db.run(`DELETE FROM users WHERE id IN (${placeholders})`, ids);
+  }
+}
+
 function createSchemaSql() {
   return `
     CREATE TABLE IF NOT EXISTS users (
@@ -185,7 +254,7 @@ function createSchemaSql() {
       location VARCHAR(255) NOT NULL,
       club VARCHAR(255) NOT NULL,
       needed_volunteers INT NOT NULL DEFAULT 1,
-      image_url TEXT,
+      image_url LONGTEXT,
       category VARCHAR(255),
       summary TEXT,
       details TEXT,
@@ -256,70 +325,50 @@ export async function initDb() {
 
   const isProduction = process.env.NODE_ENV === 'production';
   const enableDevSeed = !isProduction && process.env.ENABLE_DEV_SEED !== 'false';
-  const bootstrapAdminEmail = String(process.env.ADMIN_BOOTSTRAP_EMAIL || '').trim().toLowerCase();
-  const bootstrapAdminPassword = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || '').trim();
 
   await db.exec(createSchemaSql());
   await ensureColumn(db, 'events', 'needed_volunteers', 'INT NOT NULL DEFAULT 1');
-  await ensureColumn(db, 'events', 'image_url', 'TEXT');
+  await ensureLongTextColumn(db, 'events', 'image_url');
   await ensureColumn(db, 'applications', 'assigned_tasks', 'LONGTEXT');
   await ensureColumn(db, 'users', 'department', 'VARCHAR(255)');
   await ensureEventOwnerCascadeDelete(db);
+  await ensureSinglePrimaryAdmin(db);
 
   console.log(`Connected to MySQL at ${mysqlConfig.host}:${mysqlConfig.port}/${mysqlConfig.database}`);
 
-  if (bootstrapAdminEmail && bootstrapAdminPassword) {
-    const existingBootstrapAdmin = await db.get('SELECT id FROM users WHERE email = ?', bootstrapAdminEmail);
-    if (!existingBootstrapAdmin) {
-      const hash = await bcrypt.hash(bootstrapAdminPassword, 10);
-      await db.run(
-        'INSERT INTO users (name, email, password_hash, role, club, coordinator_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ['Admin User', bootstrapAdminEmail, hash, 'admin', null, 1, toMysqlTimestamp()],
-      );
-    }
-  }
-
   if (enableDevSeed) {
-    const adminEmail = 'admin@cuet.ac.bd';
-    const existingAdmin = await db.get('SELECT id FROM users WHERE email = ?', adminEmail);
-    if (!existingAdmin) {
-      const hash = await bcrypt.hash('admin123', 10);
-      await db.run(
-        'INSERT INTO users (name, email, password_hash, role, club, coordinator_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ['Admin User', adminEmail, hash, 'admin', null, 1, toMysqlTimestamp()],
-      );
-    }
-
-    const existingVolunteer = await db.get('SELECT id FROM users WHERE email = ?', 'u1000001@student.cuet.ac.bd');
+    const existingVolunteer = await db.get('SELECT id FROM users WHERE email = ?', 'volunteer@student.cuet.ac.bd');
     if (!existingVolunteer) {
       const hash = await bcrypt.hash('123456', 10);
       await db.run(
-        'INSERT INTO users (name, email, password_hash, role, club, coordinator_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ['Student U1000001', 'u1000001@student.cuet.ac.bd', hash, 'volunteer', null, 1, toMysqlTimestamp()],
+        'INSERT INTO users (name, email, password_hash, role, club, department, coordinator_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ['Volunteer', 'volunteer@student.cuet.ac.bd', hash, 'volunteer', null, 'CSE', 1, toMysqlTimestamp()],
       );
     }
 
-    const existingCoordinator = await db.get('SELECT id FROM users WHERE email = ?', 'u1000002@student.cuet.ac.bd');
+    const existingCoordinator = await db.get('SELECT id FROM users WHERE email = ?', 'coordinator@student.cuet.ac.bd');
     if (!existingCoordinator) {
       const hash = await bcrypt.hash('123456', 10);
       await db.run(
         'INSERT INTO users (name, email, password_hash, role, club, coordinator_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ['Student U1000002', 'u1000002@student.cuet.ac.bd', hash, 'coordinator', CLUBS[0], 1, toMysqlTimestamp()],
+        ['Coordinator', 'coordinator@student.cuet.ac.bd', hash, 'coordinator', CLUBS[0], 1, toMysqlTimestamp()],
       );
     }
 
+    await db.run('UPDATE users SET name = ? WHERE email = ?', ['Volunteer', 'volunteer@student.cuet.ac.bd']);
+    await db.run('UPDATE users SET name = ? WHERE email = ?', ['Coordinator', 'coordinator@student.cuet.ac.bd']);
+
     const countEvents = await db.get('SELECT COUNT(*) as count FROM events');
     if (!countEvents || countEvents.count === 0) {
-      const coordinator = await db.get('SELECT id, club FROM users WHERE email = ?', 'u1000002@student.cuet.ac.bd');
+      const coordinator = await db.get('SELECT id, club FROM users WHERE email = ?', 'coordinator@student.cuet.ac.bd');
       await db.run(
-        'INSERT INTO events (title, date, location, club, needed_volunteers, category, summary, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO events (title, date, location, club, needed_volunteers, summary, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           'CP Workshop: Graph Theory',
           '2026-02-10',
           'Central Lab',
           coordinator?.club || CLUBS[0],
           30,
-          'Workshop',
           'Master complex algorithms with top competitive programmers.',
           'Bring a laptop. Hands-on sessions with problem sets.',
           coordinator?.id || null,
@@ -327,14 +376,13 @@ export async function initDb() {
         ],
       );
       await db.run(
-        'INSERT INTO events (title, date, location, club, needed_volunteers, category, summary, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO events (title, date, location, club, needed_volunteers, summary, details, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           'Robotics 101: Arduino',
           '2026-02-15',
           'WRE Workshop',
           'ASRRO',
           20,
-          'Workshop',
           'Basics of hardware integration and sensor control.',
           'Tools and boards provided; limited seats.',
           null,

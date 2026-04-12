@@ -6,8 +6,8 @@ const stylesByStatus = {
   Rejected: 'bg-rose-100 text-rose-800 border-rose-200',
   Assigned: 'bg-amber-100 text-amber-800 border-amber-200',
   'Task Assigned': 'bg-amber-100 text-amber-800 border-amber-200',
-  Completed: 'bg-slate-200 text-slate-800 border-slate-300',
-  Done: 'bg-slate-200 text-slate-800 border-slate-300',
+  Completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  Done: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
 export default function StatusBadge({ status = 'Applied' }) {
