@@ -9,6 +9,7 @@ export default function AdminPanel({
   totalUsers = 0,
   totalEvents = 0,
   onApproveCoordinator,
+  onRejectCoordinator,
   onRemoveUser,
   onRemoveEvent,
 }) {
@@ -29,6 +30,17 @@ export default function AdminPanel({
     const result = await onApproveCoordinator(user.id);
     if (!result?.ok) {
       setActionError(result?.error || 'Could not approve coordinator.');
+    }
+  }
+
+  async function rejectCoordinator(user) {
+    const confirmed = window.confirm(`Reject coordinator request from ${user.email}?`);
+    if (!confirmed) return;
+
+    setActionError('');
+    const result = await onRejectCoordinator(user.id);
+    if (!result?.ok) {
+      setActionError(result?.error || 'Could not reject coordinator request.');
     }
   }
 
@@ -102,12 +114,22 @@ export default function AdminPanel({
                   <td className="py-2 text-slate-700">{user.club}</td>
                   <td className="py-2"><StatusBadge status="Applied" /></td>
                   <td className="py-2">
-                    <button
-                      onClick={() => approveCoordinator(user)}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white"
-                    >
-                      Approve
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => approveCoordinator(user)}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 font-bold text-white"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => rejectCoordinator(user)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-rose-300 bg-rose-50 text-lg font-black leading-none text-rose-700"
+                        aria-label={`Reject ${user.email}`}
+                        title="Reject"
+                      >
+                        ×
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

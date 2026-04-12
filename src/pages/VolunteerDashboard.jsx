@@ -1,8 +1,33 @@
 import React, { useMemo, useState } from 'react';
 import StatusBadge from '../components/StatusBadge';
 
+function normalizeAssignedTasks(tasks, fallbackCompleted = false) {
+  if (!Array.isArray(tasks)) return [];
+
+  return tasks
+    .map((task) => {
+      if (task && typeof task === 'object') {
+        const title = String(task.title ?? task.task ?? '').trim();
+        if (!title) return null;
+        return {
+          title,
+          completed: Boolean(task.completed),
+        };
+      }
+
+      const title = String(task || '').trim();
+      if (!title) return null;
+      return {
+        title,
+        completed: Boolean(fallbackCompleted),
+      };
+    })
+    .filter(Boolean);
+}
+
 export default function VolunteerDashboard({ events = [], currentUser, applications = [], onBrowseEvents, onOpenEvent, onToggleTaskComplete }) {
   const [actionError, setActionError] = useState('');
+  const [openTaskMenuEventId, setOpenTaskMenuEventId] = useState(null);
 
   const todayKey = useMemo(() => {
     const today = new Date();
@@ -22,15 +47,30 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
     return events.filter((event) => myEventIds.includes(event.id));
   }, [events, myApplications]);
 
+  const assignedTasksByEvent = useMemo(() => {
+    const byEvent = new Map();
+    myApplications.forEach((application) => {
+      const normalizedTasks = normalizeAssignedTasks(application.assignedTasks, Boolean(application.taskCompleted));
+      if (normalizedTasks.length) {
+        byEvent.set(application.eventId, normalizedTasks);
+      }
+    });
+    return byEvent;
+  }, [myApplications]);
+
   const tasks = useMemo(() => {
     return myApplications
-      .filter((application) => application.status === 'Approved' && Array.isArray(application.assignedTasks) && application.assignedTasks.length)
-      .flatMap((application) => application.assignedTasks.map((task, idx) => ({
-        id: application.id,
-        key: `${application.id}-${idx}`,
-        title: task,
-        done: Boolean(application.taskCompleted),
-      })));
+      .filter((application) => application.status === 'Approved')
+      .flatMap((application) => {
+        const normalizedTasks = normalizeAssignedTasks(application.assignedTasks, Boolean(application.taskCompleted));
+        return normalizedTasks.map((task, idx) => ({
+          id: application.id,
+          key: `${application.id}-${idx}`,
+          taskIndex: idx,
+          title: task.title,
+          done: task.completed,
+        }));
+      });
   }, [myApplications]);
 
   const notifications = useMemo(() => {
@@ -70,9 +110,11 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
     if (application.status === 'Rejected') return 'Rejected';
     if (application.status === 'Applied') return 'Applied';
     if (application.status === 'Approved') {
+      const normalizedTasks = normalizeAssignedTasks(application.assignedTasks, Boolean(application.taskCompleted));
+      const allTasksCompleted = normalizedTasks.length > 0 && normalizedTasks.every((task) => task.completed);
       if (application.eventDate < todayKey) return 'Done';
-      if (application.taskCompleted) return 'Completed';
-      if (Array.isArray(application.assignedTasks) && application.assignedTasks.length) return 'Task Assigned';
+      if (allTasksCompleted || application.taskCompleted) return 'Completed';
+      if (normalizedTasks.length) return 'Task Assigned';
       return 'Approved';
     }
     return application.status;
@@ -84,9 +126,9 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
     [myApplications],
   );
 
-  async function toggleTask(taskId, currentDone) {
+  async function toggleTask(taskId, taskIndex, currentDone) {
     setActionError('');
-    const result = await onToggleTaskComplete(taskId, !currentDone);
+    const result = await onToggleTaskComplete(taskId, taskIndex, !currentDone);
     if (!result?.ok) {
       setActionError(result?.error || 'Could not update task completion.');
     }
@@ -129,52 +171,61 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
             </p>
           ) : (
             <div className="space-y-3">
-              {appliedEvents.map((event) => (
-                <div key={event.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div>
-                    <h3 className="font-black text-slate-900">{event.title}</h3>
-                    <p className="text-sm text-slate-600">{event.date} • {event.location}</p>
+              {appliedEvents.map((event) => {
+                const application = myApplications.find((item) => item.eventId === event.id) || null;
+                const statusApplication = application || { status: 'Applied', eventDate: event.date };
+                const eventTasks = assignedTasksByEvent.get(event.id) || [];
+                const isTaskMenuOpen = openTaskMenuEventId === event.id;
+
+                return (
+                  <div key={event.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-black text-slate-900">{event.title}</h3>
+                        <p className="text-sm text-slate-600">{event.date} • {event.location}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={getApplicationStatusLabel(statusApplication)} />
+                        {eventTasks.length > 0 && (
+                          <button
+                            onClick={() => setOpenTaskMenuEventId((current) => (current === event.id ? null : event.id))}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700"
+                          >
+                            {isTaskMenuOpen ? 'Hide' : 'View'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isTaskMenuOpen && eventTasks.length > 0 && (
+                      <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Assigned Tasks</p>
+                        {eventTasks.map((task, taskIndex) => (
+                          <div key={`${event.id}-${task.title}-${taskIndex}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+                            <div>
+                              <p className={`font-semibold ${task.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <StatusBadge status={task.completed ? 'Completed' : 'Assigned'} />
+                              <button
+                                onClick={() => {
+                                  if (!application?.id) return;
+                                  toggleTask(application.id, taskIndex, task.completed);
+                                }}
+                                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-bold text-white"
+                              >
+                                {task.completed ? 'Mark Not Done' : 'Mark Done'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={getApplicationStatusLabel(myApplications.find((application) => application.eventId === event.id) || { status: 'Applied', eventDate: event.date })} />
-                    <button
-                      onClick={() => onOpenEvent(event.id)}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700"
-                    >
-                      View
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-
-          <div className="mt-7">
-            <h3 className="mb-3 text-lg font-black text-slate-900">Assigned Tasks</h3>
-            <div className="space-y-3">
-              {tasks.length === 0 && (
-                <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-                  No approved tasks assigned yet.
-                </p>
-              )}
-              {tasks.map((task) => (
-                <div key={task.key} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
-                  <div>
-                    <p className={`font-semibold ${task.done ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={task.done ? 'Completed' : 'Assigned'} />
-                    <button
-                      onClick={() => toggleTask(task.id, task.done)}
-                      className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-bold text-white"
-                    >
-                      {task.done ? 'Mark Not Done' : 'Mark Done'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </article>
 
         <aside className="rounded-2xl border border-amber-100 bg-white p-5">

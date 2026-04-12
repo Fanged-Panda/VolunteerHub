@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { apiRequest } from '../lib/api';
-import logo from '../assets/logo.png';
 
 const SUGGESTED_QUESTIONS = [
   'How can I apply for an event?',
@@ -26,7 +25,9 @@ export default function ChatbotWidget() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0 });
   const widgetRef = useRef(null);
+  const triggerRef = useRef(null);
   const chatEndRef = useRef(null);
 
   const canSend = useMemo(() => draft.trim().length > 0 && !sending, [draft, sending]);
@@ -59,6 +60,34 @@ export default function ChatbotWidget() {
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    function updateEyes(clientX, clientY) {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = clientX - centerX;
+      const dy = clientY - centerY;
+      const distance = Math.hypot(dx, dy) || 1;
+      const maxDistance = 5;
+      const scale = Math.min(maxDistance, distance) / distance;
+
+      setEyeOffset({
+        x: Number((dx * scale).toFixed(2)),
+        y: Number((dy * scale).toFixed(2)),
+      });
+    }
+
+    function handlePointerMove(event) {
+      updateEyes(event.clientX, event.clientY);
+    }
+
+    window.addEventListener('mousemove', handlePointerMove);
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+    };
+  }, []);
 
   async function sendQuestion(text) {
     const question = String(text || '').trim();
@@ -116,9 +145,10 @@ export default function ChatbotWidget() {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 hover:bg-orange-50"
+              className="rounded-md p-1 text-lg font-black leading-none text-slate-700 hover:bg-orange-100"
+              aria-label="Close chat"
             >
-              Close
+              ×
             </button>
           </div>
 
@@ -201,17 +231,29 @@ export default function ChatbotWidget() {
         </div>
       )}
 
-      <button
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="rounded-full bg-orange-500 px-3 py-3 text-sm font-black text-white shadow-lg transition hover:bg-orange-600"
-        aria-label={isOpen ? 'Hide chat' : 'Open chat'}
-      >
-        {isOpen ? (
-          'Hide Chat'
-        ) : (
-          <img src={logo} alt="VolunteerHub" className="h-8 w-8 rounded-full object-cover" />
-        )}
-      </button>
+      {!isOpen && (
+        <button
+          ref={triggerRef}
+          onClick={() => setIsOpen(true)}
+          className="rounded-full bg-orange-500 px-3 py-3 text-sm font-black text-white shadow-lg transition hover:bg-orange-600"
+          aria-label="Open chat"
+        >
+          <span className="vh-googly" aria-hidden="true">
+            <span className="vh-googly__eye">
+              <span
+                className="vh-googly__pupil"
+                style={{ transform: `translate(${eyeOffset.x}px, ${eyeOffset.y}px)` }}
+              />
+            </span>
+            <span className="vh-googly__eye">
+              <span
+                className="vh-googly__pupil"
+                style={{ transform: `translate(${eyeOffset.x * 0.95}px, ${eyeOffset.y * 0.95}px)` }}
+              />
+            </span>
+          </span>
+        </button>
+      )}
     </div>
   );
 }
