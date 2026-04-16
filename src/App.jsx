@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import Home from './pages/Home';
 import About from './pages/About';
 import Gallery from './pages/GalleryAlt';
@@ -616,6 +617,7 @@ export default function App() {
       )}
 
       <ChatbotWidget />
+      <SpeedInsights />
     </div>
   );
 }
