@@ -48,9 +48,19 @@ const DETAIL_SECTIONS = [
       { primary: 'Twitter', href: 'https://x.com/' },
     ],
   },
+  {
+    title: 'Credits',
+    tone: 'compact',
+    items: [
+      { secondary: 'Directed by', primary: 'Sajjad Hossain' },
+      { secondary: 'Chief Editor', primary: 'Tahmid Hossain' },
+      { secondary: 'Executive Producer', primary: 'A.M. Fardin Hasan' },
+    ],
+  },
 ];
 
-function AboutScrollableContent({ isNight, mini = false }) {
+
+function AboutScrollableContent({ isNight, mini = false, endRef = null }) {
   const introClass = isNight ? 'text-slate-200' : 'text-slate-900';
   const sectionTitleClass = isNight ? 'text-slate-200' : 'text-slate-900';
   const itemPrimaryClass = isNight ? 'text-slate-300' : 'text-slate-900';
@@ -78,6 +88,12 @@ function AboutScrollableContent({ isNight, mini = false }) {
           <div className="space-y-7">
             {section.items.map((item) => (
               <article key={`${section.title}-${item.primary}`}>
+                {section.title === 'Credits' && item.secondary && (
+                  <p className={`mb-2 text-base leading-tight sm:text-[1.8rem] ${itemSecondaryClass}`}>
+                    {item.secondary}
+                  </p>
+                )}
+
                 {item.href ? (
                   <a
                     href={item.href}
@@ -99,7 +115,7 @@ function AboutScrollableContent({ isNight, mini = false }) {
                   </p>
                 )}
 
-                {item.secondary && (
+                {item.secondary && section.title !== 'Credits' && (
                   <p className={`mt-2 text-base leading-tight sm:text-[1.8rem] ${itemSecondaryClass}`}>
                     {item.secondary}
                   </p>
@@ -111,7 +127,7 @@ function AboutScrollableContent({ isNight, mini = false }) {
         </section>
       ))}
 
-      <div className="h-8" />
+      <div ref={mini ? undefined : endRef} className="h-[calc(100vh-7rem)]" />
     </div>
   );
 }
@@ -119,8 +135,16 @@ function AboutScrollableContent({ isNight, mini = false }) {
 export default function About({ theme = 'day' }) {
   const isNight = theme === 'night';
   const contentRef = useRef(null);
+  const contentEndRef = useRef(null);
   const mapRef = useRef(null);
   const previewRef = useRef(null);
+  const autoScrollStateRef = useRef({
+    frameId: null,
+    lastTs: 0,
+    paused: false,
+    manualScrollUntilTs: 0,
+    pendingTargetTop: null,
+  });
   const [scrollState, setScrollState] = useState({ scrollTop: 0, scrollHeight: 1, clientHeight: 1 });
   const [mapMetrics, setMapMetrics] = useState({ containerHeight: 1, previewScaledHeight: 1 });
 
@@ -153,6 +177,60 @@ export default function About({ theme = 'day' }) {
     };
   }, []);
 
+  useEffect(() => {
+    const panel = contentRef.current;
+    if (!panel) return undefined;
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return undefined;
+
+    const SPEED_PX_PER_SECOND = 34;
+    const state = autoScrollStateRef.current;
+
+    const onFrame = (ts) => {
+      if (!state.lastTs) state.lastTs = ts;
+      const elapsed = ts - state.lastTs;
+      state.lastTs = ts;
+
+      if (ts < state.manualScrollUntilTs) {
+        state.frameId = window.requestAnimationFrame(onFrame);
+        return;
+      }
+
+      if (state.pendingTargetTop !== null) {
+        panel.scrollTop = state.pendingTargetTop;
+        state.pendingTargetTop = null;
+        state.lastTs = ts;
+      }
+
+      if (!state.paused && elapsed > 0) {
+        const contentEnd = contentEndRef.current;
+        const panelBounds = panel.getBoundingClientRect();
+        const contentEndBounds = contentEnd?.getBoundingClientRect();
+        if (contentEndBounds && contentEndBounds.top <= panelBounds.top) {
+          panel.scrollTop = 0;
+        } else {
+          const maxScrollTop = Math.max(panel.scrollHeight - panel.clientHeight, 0);
+          const deltaPx = (elapsed / 1000) * SPEED_PX_PER_SECOND;
+          panel.scrollTop = Math.min(panel.scrollTop + deltaPx, maxScrollTop);
+        }
+      }
+
+      state.frameId = window.requestAnimationFrame(onFrame);
+    };
+
+    state.frameId = window.requestAnimationFrame(onFrame);
+
+    return () => {
+      if (state.frameId) window.cancelAnimationFrame(state.frameId);
+      state.frameId = null;
+      state.lastTs = 0;
+      state.paused = false;
+      state.manualScrollUntilTs = 0;
+      state.pendingTargetTop = null;
+    };
+  }, []);
+
   const minimapFrame = useMemo(() => {
     const scrollHeight = Math.max(scrollState.scrollHeight, 1);
     const clientHeight = Math.max(scrollState.clientHeight, 1);
@@ -176,12 +254,24 @@ export default function About({ theme = 'day' }) {
   function jumpToScrollPosition(event) {
     const map = mapRef.current;
     const panel = contentRef.current;
+    const preview = previewRef.current;
     if (!map || !panel) return;
 
     const bounds = map.getBoundingClientRect();
-    const ratio = (event.clientY - bounds.top) / Math.max(bounds.height, 1);
-    const clampedRatio = Math.max(0, Math.min(1, ratio));
-    const targetTop = clampedRatio * Math.max(panel.scrollHeight - panel.clientHeight, 0);
+    const previewHeight = Math.min(
+      bounds.height,
+      Math.max((preview?.offsetHeight || 1) * PREVIEW_SCALE, 1),
+    );
+    const relativeY = event.clientY - bounds.top;
+    const clampedY = Math.max(0, Math.min(previewHeight, relativeY));
+    const ratio = clampedY / Math.max(previewHeight, 1);
+    const maxScrollTop = Math.max(panel.scrollHeight - panel.clientHeight, 0);
+    const targetTop = ratio * maxScrollTop;
+    const distance = Math.abs(panel.scrollTop - targetTop);
+    const settleMs = Math.min(2200, Math.max(700, distance * 1.4));
+    autoScrollStateRef.current.manualScrollUntilTs = window.performance.now() + settleMs;
+    autoScrollStateRef.current.pendingTargetTop = targetTop;
+    autoScrollStateRef.current.lastTs = 0;
 
     panel.scrollTo({ top: targetTop, behavior: 'smooth' });
   }
@@ -191,11 +281,11 @@ export default function About({ theme = 'day' }) {
 
   return (
     <main className={`min-h-[calc(100vh-4rem)] px-4 py-8 sm:px-6 lg:px-8 ${pageClass}`}>
-      <div className="mx-auto grid max-w-[1100px] grid-cols-[minmax(105px,20vw)_minmax(0,1fr)] gap-6 justify-center sm:grid-cols-[minmax(120px,18vw)_minmax(0,1fr)] lg:grid-cols-[minmax(140px,15%)_minmax(0,680px)] lg:gap-8">
-        <aside className="self-start">
+      <div className="mx-auto grid max-w-[1100px] gap-6 justify-center lg:grid-cols-[minmax(140px,15%)_minmax(0,680px)] lg:gap-8">
+        <aside className="hidden self-start lg:block">
           <div
             ref={mapRef}
-            onClick={jumpToScrollPosition}
+            onPointerDown={jumpToScrollPosition}
             className="relative h-[72vh] min-h-[26rem] overflow-hidden lg:fixed lg:left-[1%] lg:top-24 lg:h-[calc(100vh-8rem)] lg:w-[140px]"
             aria-label="About minimap"
           >
@@ -227,7 +317,7 @@ export default function About({ theme = 'day' }) {
           ref={contentRef}
           className="vh-hide-scrollbar h-[calc(100vh-7rem)] overflow-y-auto pr-1 sm:pr-2"
         >
-          <AboutScrollableContent isNight={isNight} />
+          <AboutScrollableContent isNight={isNight} endRef={contentEndRef} />
         </section>
       </div>
     </main>

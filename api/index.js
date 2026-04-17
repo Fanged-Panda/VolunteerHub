@@ -485,6 +485,33 @@ app.get('/api/events', async (req, res) => {
   res.json({ events: rows });
 });
 
+app.get('/api/meta/top-contributors', async (req, res) => {
+  const rows = await db.all(
+    `SELECT u.id,
+            u.name,
+            u.email,
+            u.club,
+            u.department,
+            COUNT(*) AS approvedApplications,
+            COUNT(DISTINCT a.event_id) AS eventsParticipated,
+            SUM(CASE WHEN a.attendance = 1 THEN 1 ELSE 0 END) AS attendanceCount,
+            SUM(CASE WHEN a.task_completed = 1 THEN 1 ELSE 0 END) AS completedTasks,
+            (
+              COUNT(*) +
+              SUM(CASE WHEN a.attendance = 1 THEN 1 ELSE 0 END) * 3 +
+              SUM(CASE WHEN a.task_completed = 1 THEN 1 ELSE 0 END) * 2
+            ) AS score
+     FROM applications a
+     JOIN users u ON u.id = a.volunteer_id
+     WHERE a.status = 'Approved'
+     GROUP BY u.id, u.name, u.email, u.club, u.department
+     ORDER BY score DESC, attendanceCount DESC, approvedApplications DESC, u.id ASC
+     LIMIT 6`,
+  );
+
+  res.json({ contributors: rows });
+});
+
 app.post('/api/events', authRequired, roleRequired('coordinator'), async (req, res) => {
   const owner = await db.get('SELECT * FROM users WHERE id = ?', req.user.id);
   if (!owner || !owner.coordinator_approved) {
