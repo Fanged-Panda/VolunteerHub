@@ -8,6 +8,7 @@ import CoordinatorDashboard from './pages/CoordinatorDashboard';
 import AdminPanel from './pages/AdminPanel';
 import AuthPage from './pages/AuthPage';
 import TopNav from './components/TopNav';
+import Preloader from './components/Preloader';
 import ChatbotWidget from './components/ChatbotWidget';
 import { apiRequest, clearStoredToken, getStoredToken, setStoredToken } from './lib/api';
 
@@ -68,6 +69,7 @@ export default function App() {
 
   const [clubs, setClubs] = useState([]);
   const [events, setEvents] = useState([]);
+  const [topContributors, setTopContributors] = useState([]);
   const [applications, setApplications] = useState([]);
   const [coordinatorApplications, setCoordinatorApplications] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
@@ -193,6 +195,13 @@ export default function App() {
         await refreshEvents();
       } catch {
         setEvents([]);
+      }
+
+      try {
+        const contributorsData = await apiRequest('/api/meta/top-contributors', { token: '' });
+        setTopContributors(contributorsData.contributors || []);
+      } catch {
+        setTopContributors([]);
       }
 
       if (!token) {
@@ -489,22 +498,8 @@ export default function App() {
     setTheme((prev) => (prev === 'night' ? 'day' : 'night'));
   }
 
-  function renderCapsuleLoader() {
-    return (
-      <div className={`vh-loader-screen ${isNight ? 'vh-loader-night' : 'vh-loader-day'}`}>
-        <div className="vh-loader-circle" aria-hidden="true">
-          <div className="vh-loader-capsule" style={{ '--medicineCount': 8 }}>
-            {Array.from({ length: 8 }).map((_, index) => (
-              <i key={index + 1} style={{ '--order': index + 1 }} />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (loading) {
-    return renderCapsuleLoader();
+    return <Preloader theme={theme} />;
   }
 
   return (
@@ -523,6 +518,7 @@ export default function App() {
       {currentPage === 'home' && (
         <Home
           events={events}
+          topContributors={topContributors}
           setSelectedEvent={setSelectedEventId}
           openEvents={openEvents}
           openGallery={() => navigateTo('gallery')}

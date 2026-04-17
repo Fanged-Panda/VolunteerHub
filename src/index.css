@@ -597,7 +597,110 @@ textarea:disabled {
 	.vh-theme-switch {
 		--width: 70px;
 	}
+
+	.vh-preloader {
+		--barWidth: 8px;
+		--barHeight: 44px;
+		--barGap: 5px;
+	}
 }
+
+.vh-preloader-screen {
+	--vh-preloader-bg: #fff7ed;
+	--vh-preloader-bar: #1f2937;
+	min-height: 100vh;
+	width: 100%;
+	display: grid;
+	place-content: center;
+	place-items: center;
+	padding: 1.5rem;
+	overflow: hidden;
+	background: var(--vh-preloader-bg);
+}
+
+.vh-preloader-screen--day {
+	--vh-preloader-bg: #fff7ed;
+	--vh-preloader-bar: #1f2937;
+}
+
+.vh-preloader-screen--night {
+	--vh-preloader-bg: #0f172a;
+	--vh-preloader-bar: #f8fafc;
+}
+
+.vh-preloader {
+	--barWidth: 10px;
+	--barHeight: 60px;
+	--barGap: 6px;
+	--aniTime: 1.15s;
+	--aniDelay: 0.17s;
+	position: relative;
+	width: calc(var(--barWidth) * 5 + var(--barGap) * 4);
+	height: var(--barHeight);
+}
+
+.vh-preloader i {
+	width: var(--barWidth);
+	height: var(--barHeight);
+	background: var(--vh-preloader-bar);
+	border-radius: 999px;
+	position: absolute;
+	left: calc(var(--order) * var(--barWidth) - var(--barWidth) + var(--order) * var(--barGap) - var(--barGap));
+	animation: vh-preloader-pulse calc(var(--aniTime) + var(--order) * var(--aniDelay)) ease infinite;
+}
+
+.vh-preloader i:nth-child(2n+1) {
+	top: 0;
+}
+
+.vh-preloader i:nth-child(2n) {
+	top: 10px;
+}
+
+.vh-credits-stage {
+	position: relative;
+	height: min(42vh, 360px);
+	overflow: hidden;
+	perspective: 360px;
+	mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 80%, transparent 100%);
+}
+
+.vh-credits-roll {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -38%;
+	transform-origin: 50% 100%;
+	animation: vh-credits-rise 24s linear infinite;
+	padding: 0 0.25rem;
+}
+
+@keyframes vh-credits-rise {
+	0% {
+		transform: translateY(80%) rotateX(24deg) scale(0.96);
+		opacity: 0;
+	}
+	10% {
+		opacity: 1;
+	}
+	92% {
+		opacity: 1;
+	}
+	100% {
+		transform: translateY(-115%) rotateX(24deg) scale(1.04);
+		opacity: 0;
+	}
+}
+
+@keyframes vh-preloader-pulse {
+	50% {
+		height: 40%;
+	}
+	100% {
+		height: 100%;
+	}
+}
+
 
 .vh-loader-screen {
 	--circleWidth: 220px;

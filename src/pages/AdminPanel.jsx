@@ -70,11 +70,6 @@ export default function AdminPanel({
     }
   }
 
-  function statusForUser(user) {
-    if (user.role === 'coordinator' && !user.coordinatorApproved) return 'Applied';
-    return 'Approved';
-  }
-
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-6 rounded-2xl border border-amber-100 bg-white p-5">
@@ -112,7 +107,7 @@ export default function AdminPanel({
                   <td className="py-2 font-semibold text-slate-900">{user.name}</td>
                   <td className="py-2 text-slate-700">{user.email}</td>
                   <td className="py-2 text-slate-700">{user.club}</td>
-                  <td className="py-2"><StatusBadge status="Applied" /></td>
+                  <td className="py-2"><StatusBadge status="Pending" /></td>
                   <td className="py-2">
                     <div className="flex items-center gap-2">
                       <button
@@ -151,7 +146,6 @@ export default function AdminPanel({
                 <th className="py-2 font-bold">Email</th>
                 <th className="py-2 font-bold">Role</th>
                 <th className="py-2 font-bold">Club/Department</th>
-                <th className="py-2 font-bold">Status</th>
                 <th className="py-2 font-bold">Action</th>
               </tr>
             </thead>
@@ -162,7 +156,6 @@ export default function AdminPanel({
                   <td className="py-2 text-slate-700">{user.email}</td>
                   <td className="py-2 text-slate-700">{user.role}</td>
                   <td className="py-2 text-slate-700">{user.role === 'coordinator' ? (user.club || 'N/A') : (user.department || 'N/A')}</td>
-                  <td className="py-2"><StatusBadge status={statusForUser(user)} /></td>
                   <td className="py-2">
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -178,7 +171,7 @@ export default function AdminPanel({
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-4 text-center text-slate-500">No users found.</td>
+                  <td colSpan={5} className="py-4 text-center text-slate-500">No users found.</td>
                 </tr>
               )}
             </tbody>

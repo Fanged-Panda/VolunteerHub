@@ -1,5 +1,4 @@
 import React, { useMemo, useRef, useState } from 'react';
-import StatusBadge from '../components/StatusBadge';
 
 const blankForm = {
   id: null,
@@ -492,7 +491,6 @@ export default function CoordinatorDashboard({
                     <p className="text-sm text-slate-600">{application.eventTitle}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <StatusBadge status={application.status} />
                     {application.status === 'Approved' && normalizedAssignedTasks.length > 0 && (
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">Task Assigned</span>
                     )}
@@ -557,7 +555,7 @@ export default function CoordinatorDashboard({
                     {normalizedAssignedTasks.map((task, idx) => (
                       <li key={`${application.id}-${idx}`} className="flex items-center justify-between gap-2">
                         <span>{task.title}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${task.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${task.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
                           {task.completed ? 'Completed' : 'Pending'}
                         </span>
                       </li>

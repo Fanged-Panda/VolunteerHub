@@ -65,7 +65,7 @@ const IMPACT_QUOTES = [
   },
 ];
 
-export default function Home({ events = [], setSelectedEvent, openEvents, openGallery }) {
+export default function Home({ events = [], topContributors = [], setSelectedEvent, openEvents, openGallery }) {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const slides = useMemo(
@@ -99,8 +99,26 @@ export default function Home({ events = [], setSelectedEvent, openEvents, openGa
   }, [events, hasUpcomingEvents, upcomingEvents]);
 
   const marqueeEvents = useMemo(() => (activeEvents.length ? [...activeEvents, ...activeEvents] : []), [activeEvents]);
-  const spotlightEvents = useMemo(() => activeEvents.slice(0, 3), [activeEvents]);
   const timelineEvents = useMemo(() => activeEvents.slice(0, 5), [activeEvents]);
+  const contributorCards = useMemo(
+    () => [...topContributors]
+      .map((person) => ({
+        ...person,
+        score: Number(person.score || 0),
+        approvedApplications: Number(person.approvedApplications || 0),
+        attendanceCount: Number(person.attendanceCount || 0),
+        completedTasks: Number(person.completedTasks || 0),
+        eventsParticipated: Number(person.eventsParticipated || 0),
+      }))
+      .sort((a, b) => {
+        if (b.approvedApplications !== a.approvedApplications) return b.approvedApplications - a.approvedApplications;
+        if (b.eventsParticipated !== a.eventsParticipated) return b.eventsParticipated - a.eventsParticipated;
+        return b.attendanceCount - a.attendanceCount;
+      })
+      .slice(0, 2)
+      .map((person, index) => ({ ...person, rank: index + 1 })),
+    [topContributors],
+  );
 
   const quickStats = useMemo(() => {
     const activeClubs = new Set(activeEvents.map((event) => String(event.club || '').trim()).filter(Boolean)).size;
@@ -179,7 +197,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents, openGa
             </p>
             <h1 className="text-4xl font-black leading-tight text-slate-900 sm:text-5xl lg:text-6xl">
               Volunteering 
-              <span className="block text-orange-500">Simplified</span>
+              <span className="block text-orange-500" style={{ fontFamily: '"Kaushan Script", cursive' }}>Simplified</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
               Discover CUET-only opportunities, apply faster, coordinate better, and track every contribution from one unified platform.
@@ -210,7 +228,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents, openGa
                 key={slide.label}
                 src={slide.src}
                 alt={slide.alt}
-                className={`absolute left-0 top-0 h-[460px] w-full object-cover transition-opacity duration-700 ${
+                  className={`absolute left-0 top-0 h-[320px] w-full object-cover transition-opacity duration-700 sm:h-[460px] ${
                   index === activeSlide ? 'opacity-100' : 'opacity-0'
                 }`}
               />
@@ -218,7 +236,7 @@ export default function Home({ events = [], setSelectedEvent, openEvents, openGa
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
 
-            <div className="relative flex h-[460px] items-end justify-between p-4">
+            <div className="relative flex h-[320px] items-end justify-between p-4 sm:h-[460px]">
               <div className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
                 {slides[activeSlide].label}
               </div>
@@ -426,36 +444,49 @@ export default function Home({ events = [], setSelectedEvent, openEvents, openGa
 
       <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
         <div className="mb-6">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Spotlight</p>
-          <h2 className="mt-2 text-3xl font-black text-slate-900">Featured Opportunities</h2>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">Top Contributors</p>
+          <h2 className="mt-2 text-3xl font-black text-slate-900">People Carrying The Load</h2>
         </div>
 
-        {spotlightEvents.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No spotlight events available yet.</p>
+        {contributorCards.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No contributor data available yet.</p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-3">
-            {spotlightEvents.map((event, index) => (
+          <div className="grid gap-4 md:grid-cols-2">
+            {contributorCards.map((person) => (
               <article
-                key={event.id}
-                className={`relative overflow-hidden rounded-3xl border border-amber-100 p-5 shadow-sm ${index === 0 ? 'lg:col-span-2 lg:min-h-[18rem]' : 'lg:min-h-[18rem]'}`}
-                style={{
-                  backgroundImage: event.imageUrl || event.image_url
-                    ? `var(--vh-event-card-overlay), url(${event.imageUrl || event.image_url})`
-                    : 'var(--vh-event-card-fallback)',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
+                key={`${person.id}-${person.email}`}
+                className="rounded-3xl border border-amber-100 bg-white p-5 shadow-sm"
               >
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700">{event.club}</p>
-                <h3 className="mt-2 text-2xl font-black text-slate-900">{event.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{event.date} • {event.location}</p>
-                <p className="mt-3 text-sm leading-relaxed text-slate-700">{event.details || event.summary || 'Full details available on the event page.'}</p>
-                <button
-                  onClick={() => openEventDetails(event.id)}
-                  className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-800"
-                >
-                  Open Event
-                </button>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-orange-700">Rank #{String(person.rank).padStart(2, '0')}</p>
+                    <h3 className="mt-2 text-2xl font-black text-slate-900">{person.name}</h3>
+                    <p className="mt-1 text-sm text-slate-600">{person.club || person.department || 'Campus volunteer'}</p>
+                  </div>
+                  <div className="rounded-2xl bg-amber-50 px-3 py-2 text-right">
+                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Participations</p>
+                    <p className="text-2xl font-black text-slate-900">{person.approvedApplications}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Approved</p>
+                    <p className="mt-1 text-lg font-black text-slate-900">{person.approvedApplications}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Attendance</p>
+                    <p className="mt-1 text-lg font-black text-slate-900">{person.attendanceCount}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Tasks Done</p>
+                    <p className="mt-1 text-lg font-black text-slate-900">{person.completedTasks}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 p-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Events</p>
+                    <p className="mt-1 text-lg font-black text-slate-900">{person.eventsParticipated}</p>
+                  </div>
+                </div>
               </article>
             ))}
           </div>
