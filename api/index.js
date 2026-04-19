@@ -24,6 +24,7 @@ const CLUBS = [
 ];
 const CUET_STUDENT_EMAIL = /^(u\d+|admin)@student\.cuet\.ac\.bd$/i;
 const PRIMARY_ADMIN_EMAIL = 'admin@student.cuet.ac.bd';
+const MAX_PROFILE_IMAGE_PAYLOAD_BYTES = 62_000;
 
 const app = express();
 
@@ -75,8 +76,15 @@ function sanitizeUser(user) {
     role: user.role,
     club: user.club || '',
     department: user.department || '',
+    profileImage: user.profile_image || '',
     coordinatorApproved: Boolean(user.coordinator_approved),
   };
+}
+
+function estimateDataUrlBytes(dataUrl) {
+  const commaIndex = dataUrl.indexOf(',');
+  const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+  return Math.ceil((base64.length * 3) / 4);
 }
 
 function authRequired(req, res, next) {
@@ -465,6 +473,27 @@ app.get('/api/auth/me', authRequired, async (req, res) => {
   const user = await db.get('SELECT * FROM users WHERE id = ?', req.user.id);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   return res.json({ user: sanitizeUser(user) });
+});
+
+app.patch('/api/users/me/profile-image', authRequired, async (req, res) => {
+  try {
+    const rawProfileImage = String(req.body?.profileImage || '').trim();
+    const profileImage = rawProfileImage || null;
+
+    if (profileImage && !/^data:image\//i.test(profileImage)) {
+      return res.status(400).json({ error: 'Profile image must be a valid image data URL.' });
+    }
+    if (profileImage && estimateDataUrlBytes(profileImage) > MAX_PROFILE_IMAGE_PAYLOAD_BYTES) {
+      return res.status(400).json({ error: 'Profile image is too large. Please choose a smaller image.' });
+    }
+
+    await db.run('UPDATE users SET profile_image = ? WHERE id = ?', [profileImage, req.user.id]);
+    const user = await db.get('SELECT * FROM users WHERE id = ?', req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    return res.json({ ok: true, user: sanitizeUser(user) });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'Could not save profile image.' });
+  }
 });
 
 app.get('/api/events', async (req, res) => {

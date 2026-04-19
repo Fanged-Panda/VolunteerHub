@@ -251,13 +251,34 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [selectedEventId]);
 
-  async function handleLogin({ email, password, remember }) {
+  async function handleLogin({ email, username, password, remember }) {
     try {
       const data = await apiRequest('/api/auth/login', {
         method: 'POST',
         token: '',
-        body: { email, password, remember },
+        body: { email, username, password, remember },
       });
+
+      const credentialId = String(data.user?.email || email || username || '').trim().toLowerCase();
+      if (
+        credentialId
+        && password
+        && typeof window !== 'undefined'
+        && window.isSecureContext
+        && 'PasswordCredential' in window
+        && navigator.credentials?.store
+      ) {
+        try {
+          const credential = new window.PasswordCredential({
+            id: credentialId,
+            password: String(password),
+            name: data.user?.name || credentialId,
+          });
+          await navigator.credentials.store(credential);
+        } catch {
+          // Ignore unsupported/blocked password manager storage.
+        }
+      }
 
       setStoredToken(data.token, remember);
       setToken(data.token);
@@ -278,6 +299,15 @@ export default function App() {
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err.message };
+    }
+  }
+
+  function handleLoadUserData(email) {
+    // Start loading user data in background without awaiting
+    // This optimizes the login flow by preloading data while user enters password
+    if (email && email.trim()) {
+      // Optional: Can be extended to preload user-specific data if API supports it
+      // For now, this is a placeholder for future optimization
     }
   }
 
@@ -494,6 +524,20 @@ export default function App() {
     }
   }
 
+  async function handleUpdateProfileImage(profileImage) {
+    try {
+      const data = await apiRequest('/api/users/me/profile-image', {
+        method: 'PATCH',
+        token,
+        body: { profileImage },
+      });
+      setCurrentUser(data.user || null);
+      return { ok: true, user: data.user };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
   function toggleTheme() {
     setTheme((prev) => (prev === 'night' ? 'day' : 'night'));
   }
@@ -511,6 +555,7 @@ export default function App() {
         currentUser={currentUser}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onUpdateProfileImage={handleUpdateProfileImage}
         onLoginClick={() => navigateTo('login')}
         onLogout={handleLogout}
       />
@@ -554,6 +599,7 @@ export default function App() {
           onForgotPasswordReset={handleForgotPasswordReset}
           onGoLogin={() => navigateTo('login')}
           onGoRegister={() => navigateTo('register')}
+          onLoadUserData={handleLoadUserData}
         />
       )}
 
@@ -608,6 +654,7 @@ export default function App() {
           onForgotPasswordReset={handleForgotPasswordReset}
           onGoLogin={() => navigateTo('login')}
           onGoRegister={() => navigateTo('register')}
+          onLoadUserData={handleLoadUserData}
         />
       )}
 

@@ -28,6 +28,7 @@ function normalizeAssignedTasks(tasks, fallbackCompleted = false) {
 export default function VolunteerDashboard({ events = [], currentUser, applications = [], onBrowseEvents, onOpenEvent, onToggleTaskComplete }) {
   const [actionError, setActionError] = useState('');
   const [openTaskMenuEventId, setOpenTaskMenuEventId] = useState(null);
+  const [viewMode, setViewMode] = useState('applied');
 
   const todayKey = useMemo(() => {
     const today = new Date();
@@ -44,8 +45,15 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
 
   const appliedEvents = useMemo(() => {
     const myEventIds = myApplications.map((application) => application.eventId);
-    return events.filter((event) => myEventIds.includes(event.id));
-  }, [events, myApplications]);
+    return events.filter((event) => myEventIds.includes(event.id) && event.date >= todayKey);
+  }, [events, myApplications, todayKey]);
+
+  const pastEvents = useMemo(() => {
+    const myEventIds = myApplications
+      .filter((application) => application.attendance)
+      .map((application) => application.eventId);
+    return events.filter((event) => myEventIds.includes(event.id) && event.date < todayKey);
+  }, [events, myApplications, todayKey]);
 
   const assignedTasksByEvent = useMemo(() => {
     const byEvent = new Map();
@@ -153,25 +161,25 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
           <p className="mt-2 text-3xl font-black text-slate-900">{tasks.filter((task) => !task.done).length}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Volunteer Hours</p>
-          <p className="mt-2 text-3xl font-black text-slate-900">{hours}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Past Events</p>
+          <p className="mt-2 text-3xl font-black text-slate-900">{pastEvents.length}</p>
         </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
         <article className="rounded-2xl border border-amber-100 bg-white p-5 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-900">Applied Events</h2>
-            <button onClick={onBrowseEvents} className="text-sm font-bold text-orange-600 hover:text-orange-700">Browse events</button>
+            <h2 className="text-xl font-black text-slate-900">{viewMode === 'applied' ? 'Applied Events' : 'Past Events'}</h2>
+            <button onClick={() => setViewMode(viewMode === 'applied' ? 'past' : 'applied')} className="text-sm font-bold text-orange-600 hover:text-orange-700">{viewMode === 'applied' ? 'Past Events' : 'Applied Events'}</button>
           </div>
 
-          {appliedEvents.length === 0 ? (
+          {(viewMode === 'applied' ? appliedEvents : pastEvents).length === 0 ? (
             <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-              You have not applied to any event yet.
+              {viewMode === 'applied' ? 'You have not applied to any event yet.' : 'You have no past events to show.'}
             </p>
           ) : (
             <div className="space-y-3">
-              {appliedEvents.map((event) => {
+              {(viewMode === 'applied' ? appliedEvents : pastEvents).map((event) => {
                 const application = myApplications.find((item) => item.eventId === event.id) || null;
                 const statusApplication = application || { status: 'Applied', eventDate: event.date };
                 const eventTasks = assignedTasksByEvent.get(event.id) || [];
@@ -236,12 +244,6 @@ export default function VolunteerDashboard({ events = [], currentUser, applicati
               <li key={`${note.text}-${note.time || 'n/a'}`} className="rounded-lg bg-slate-50 p-3">{note.text}</li>
             ))}
           </ul>
-
-          <div className="mt-6 rounded-xl bg-amber-50 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Volunteer Hours Summary</p>
-            <p className="mt-2 text-2xl font-black text-slate-900">{hours} hrs</p>
-            <p className="mt-1 text-sm text-slate-600">Great progress. Keep volunteering across CUET clubs.</p>
-          </div>
         </aside>
       </section>
     </main>

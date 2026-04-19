@@ -52,9 +52,12 @@ const DETAIL_SECTIONS = [
     title: 'Credits',
     tone: 'compact',
     items: [
-      { secondary: 'Directed by', primary: 'Sajjad Hossain' },
-      { secondary: 'Chief Editor', primary: 'Tahmid Hossain' },
-      { secondary: 'Executive Producer', primary: 'A.M. Fardin Hasan' },
+      // { secondary: 'Directed by', primary: 'Sajjad Hossain' },
+      // { secondary: 'Chief Editor', primary: 'Tahmid Hossain' },
+      // { secondary: 'Executive Producer', primary: 'A.M. Fardin Hasan' },
+      { primary: 'Sajjad Hossain' },
+      { primary: 'Tahmid Hossain' },
+      { primary: 'A.M. Fardin Hasan' },
     ],
   },
 ];

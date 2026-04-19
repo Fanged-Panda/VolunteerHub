@@ -77,6 +77,7 @@ export default function AuthPage({
   onRegister,
   onForgotPasswordRequest,
   onForgotPasswordReset,
+  onLoadUserData = () => {},
 }) {
   const isRegisterMode = mode === 'register';
   const coordinatorClubs = useMemo(() => Array.from(new Set(clubs.filter(Boolean))), [clubs]);
@@ -118,7 +119,14 @@ export default function AuthPage({
     setSuccess('');
     setLoading(true);
 
-    const result = await onLogin(loginData);
+    const finalizedEmail = finalizeCuetEmail(loginData.email);
+    setLoginData((prev) => ({ ...prev, email: finalizedEmail }));
+
+    const result = await onLogin({
+      ...loginData,
+      email: finalizedEmail,
+      username: finalizedEmail,
+    });
     setLoading(false);
     if (!result?.ok) {
       setError(result?.error || 'Login failed.');
@@ -327,7 +335,11 @@ export default function AuthPage({
                     required
                     autoComplete="username"
                     value={loginData.email}
-                    onBlur={() => setLoginData((prev) => ({ ...prev, email: finalizeCuetEmail(prev.email) }))}
+                    onBlur={() => {
+                      const finalizedEmail = finalizeCuetEmail(loginData.email);
+                      setLoginData((prev) => ({ ...prev, email: finalizedEmail }));
+                      onLoadUserData(finalizedEmail);
+                    }}
                     onChange={(e) => setLoginData((prev) => ({ ...prev, email: autoCompleteCuetEmail(e.target.value) }))}
                     placeholder={CUET_EMAIL_HINT}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2"
