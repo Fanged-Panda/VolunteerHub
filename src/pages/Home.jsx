@@ -149,7 +149,7 @@ export default function Home({ events = [], topContributors = [], setSelectedEve
 
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .slice(0, 3)
       .map(([club, count], index) => ({
         club,
         count,
@@ -466,25 +466,6 @@ export default function Home({ events = [], topContributors = [], setSelectedEve
                   <div className="rounded-2xl bg-amber-50 px-3 py-2 text-right">
                     <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Participations</p>
                     <p className="text-2xl font-black text-slate-900">{person.approvedApplications}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Approved</p>
-                    <p className="mt-1 text-lg font-black text-slate-900">{person.approvedApplications}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Attendance</p>
-                    <p className="mt-1 text-lg font-black text-slate-900">{person.attendanceCount}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Tasks Done</p>
-                    <p className="mt-1 text-lg font-black text-slate-900">{person.completedTasks}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Events</p>
-                    <p className="mt-1 text-lg font-black text-slate-900">{person.eventsParticipated}</p>
                   </div>
                 </div>
               </article>

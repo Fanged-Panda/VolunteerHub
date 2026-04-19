@@ -241,6 +241,7 @@ function createSchemaSql() {
       role ENUM('volunteer', 'coordinator', 'admin') NOT NULL,
       club VARCHAR(255),
       department VARCHAR(255),
+      profile_image LONGTEXT,
       coordinator_approved TINYINT(1) NOT NULL DEFAULT 1,
       created_at VARCHAR(64) NOT NULL,
       PRIMARY KEY (id),
@@ -331,6 +332,7 @@ export async function initDb() {
   await ensureLongTextColumn(db, 'events', 'image_url');
   await ensureColumn(db, 'applications', 'assigned_tasks', 'LONGTEXT');
   await ensureColumn(db, 'users', 'department', 'VARCHAR(255)');
+  await ensureLongTextColumn(db, 'users', 'profile_image');
   await ensureEventOwnerCascadeDelete(db);
   await ensureSinglePrimaryAdmin(db);
 

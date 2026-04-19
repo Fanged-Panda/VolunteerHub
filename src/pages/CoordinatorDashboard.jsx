@@ -119,25 +119,6 @@ export default function CoordinatorDashboard({
     [applications],
   );
 
-  const applicantCounts = useMemo(() => {
-    const applicants = visibleApplicants.filter((application) => application.status === 'Applied').length;
-    const volunteers = visibleApplicants.filter((application) => application.status === 'Approved').length;
-    return {
-      applicants,
-      volunteers,
-    };
-  }, [visibleApplicants]);
-
-  const filteredApplicants = useMemo(() => {
-    return visibleApplicants.filter((application) => {
-      const eventMatch = selectedApplicantEvent === 'all' || String(application.eventId) === selectedApplicantEvent;
-      const viewMatch = applicantView === 'applicants'
-        ? application.status === 'Applied'
-        : application.status === 'Approved';
-      return eventMatch && viewMatch;
-    });
-  }, [visibleApplicants, selectedApplicantEvent, applicantView]);
-
   const todayKey = useMemo(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -148,6 +129,33 @@ export default function CoordinatorDashboard({
 
   const currentEvents = useMemo(() => myEvents.filter((event) => event.date >= todayKey), [myEvents, todayKey]);
   const pastEvents = useMemo(() => myEvents.filter((event) => event.date < todayKey), [myEvents, todayKey]);
+  const currentEventIds = useMemo(
+    () => new Set(currentEvents.map((event) => String(event.id))),
+    [currentEvents],
+  );
+  const currentApplicants = useMemo(
+    () => visibleApplicants.filter((application) => currentEventIds.has(String(application.eventId))),
+    [visibleApplicants, currentEventIds],
+  );
+
+  const applicantCounts = useMemo(() => {
+    const applicants = currentApplicants.filter((application) => application.status === 'Applied').length;
+    const volunteers = currentApplicants.filter((application) => application.status === 'Approved').length;
+    return {
+      applicants,
+      volunteers,
+    };
+  }, [currentApplicants]);
+
+  const filteredApplicants = useMemo(() => {
+    return currentApplicants.filter((application) => {
+      const eventMatch = selectedApplicantEvent === 'all' || String(application.eventId) === selectedApplicantEvent;
+      const viewMatch = applicantView === 'applicants'
+        ? application.status === 'Applied'
+        : application.status === 'Approved';
+      return eventMatch && viewMatch;
+    });
+  }, [currentApplicants, selectedApplicantEvent, applicantView]);
 
   function validate(formValues, setErrors) {
     const nextErrors = {};
@@ -447,7 +455,7 @@ export default function CoordinatorDashboard({
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               >
                 <option value="all">All Created Events</option>
-                {myEvents.map((event) => (
+                {currentEvents.map((event) => (
                   <option key={event.id} value={String(event.id)}>
                     {event.title} ({event.date})
                   </option>
@@ -762,13 +770,6 @@ export default function CoordinatorDashboard({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700"
-                >
-                  Cancel
-                </button>
                 <button
                   type="submit"
                   disabled={!isApproved || savingEdit}
