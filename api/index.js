@@ -252,6 +252,22 @@ app.get('/api/meta/clubs', async (req, res) => {
   });
 });
 
+app.get('/api/meta/stats', async (req, res) => {
+  const [roleCounts, coordinatorClubCount] = await Promise.all([
+    db.all('SELECT role, COUNT(*) AS count FROM users GROUP BY role'),
+    db.get(
+      "SELECT COUNT(DISTINCT club) AS count FROM users WHERE role = 'coordinator' AND coordinator_approved = 1 AND club IS NOT NULL AND TRIM(club) <> ''",
+    ),
+  ]);
+
+  const roleMap = Object.fromEntries((roleCounts || []).map((row) => [row.role, Number(row.count || 0)]));
+
+  res.json({
+    registeredVolunteers: Number(roleMap.volunteer || 0),
+    registeredCoordinatorClubs: Number(coordinatorClubCount?.count || 0),
+  });
+});
+
 app.post('/api/auth/request-verification', async (req, res) => {
   try {
     const { email } = req.body || {};

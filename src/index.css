@@ -628,6 +628,28 @@ textarea:disabled {
 	--vh-preloader-bar: #f8fafc;
 }
 
+/* Overlay variant: render as fixed overlay so app can mount underneath */
+.vh-preloader-overlay {
+	position: fixed;
+	inset: 0;
+	display: grid;
+	place-content: center;
+	place-items: center;
+	padding: 1.5rem;
+	background: #fff7ed;
+	z-index: 9999;
+}
+
+.vh-preloader-overlay--day {
+	--vh-preloader-bar: #1f2937;
+	background: #fff7ed;
+}
+
+.vh-preloader-overlay--night {
+	--vh-preloader-bar: #f8fafc;
+	background: #0f172a;
+}
+
 .vh-preloader {
 	--barWidth: 10px;
 	--barHeight: 60px;

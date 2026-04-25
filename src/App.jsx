@@ -70,6 +70,7 @@ export default function App() {
   const [clubs, setClubs] = useState([]);
   const [events, setEvents] = useState([]);
   const [topContributors, setTopContributors] = useState([]);
+  const [siteStats, setSiteStats] = useState({ registeredVolunteers: 0, registeredCoordinatorClubs: 0 });
   const [applications, setApplications] = useState([]);
   const [coordinatorApplications, setCoordinatorApplications] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
@@ -180,29 +181,34 @@ export default function App() {
   async function bootstrap() {
     setLoading(true);
     try {
-      try {
-        const clubsData = await apiRequest('/api/meta/clubs', { token: '' });
-        const allClubs = Array.isArray(clubsData.clubs) ? clubsData.clubs : [];
-        const availableCoordinatorClubs = Array.isArray(clubsData.availableCoordinatorClubs)
-          ? clubsData.availableCoordinatorClubs
-          : allClubs;
-        setClubs(availableCoordinatorClubs);
-      } catch {
-        setClubs([]);
-      }
+      // Parallelize independent bootstrap requests to avoid waterfall
+      const clubsPromise = apiRequest('/api/meta/clubs', { token: '' }).catch(() => ({ clubs: [], availableCoordinatorClubs: [] }));
+      const eventsPromise = apiRequest('/api/events').catch(() => ({ events: [] }));
+      const contributorsPromise = apiRequest('/api/meta/top-contributors', { token: '' }).catch(() => ({ contributors: [] }));
+      const statsPromise = apiRequest('/api/meta/stats', { token: '' }).catch(() => ({ registeredVolunteers: 0, registeredCoordinatorClubs: 0 }));
 
-      try {
-        await refreshEvents();
-      } catch {
-        setEvents([]);
-      }
+      // If we have a token, start fetching current user in parallel so it can resolve while other requests run
+      const mePromise = token ? apiRequest('/api/auth/me', { token }).catch(() => null) : null;
 
-      try {
-        const contributorsData = await apiRequest('/api/meta/top-contributors', { token: '' });
-        setTopContributors(contributorsData.contributors || []);
-      } catch {
-        setTopContributors([]);
-      }
+      const [clubsData, eventsData, contributorsData, statsData] = await Promise.all([
+        clubsPromise,
+        eventsPromise,
+        contributorsPromise,
+        statsPromise,
+      ]);
+
+      const allClubs = Array.isArray(clubsData.clubs) ? clubsData.clubs : [];
+      const availableCoordinatorClubs = Array.isArray(clubsData.availableCoordinatorClubs)
+        ? clubsData.availableCoordinatorClubs
+        : allClubs;
+      setClubs(availableCoordinatorClubs);
+
+      setEvents(Array.isArray(eventsData.events) ? eventsData.events : []);
+      setTopContributors(Array.isArray(contributorsData.contributors) ? contributorsData.contributors : []);
+      setSiteStats({
+        registeredVolunteers: Number(statsData.registeredVolunteers || 0),
+        registeredCoordinatorClubs: Number(statsData.registeredCoordinatorClubs || 0),
+      });
 
       if (!token) {
         setCurrentUser(null);
@@ -210,11 +216,11 @@ export default function App() {
         return;
       }
 
-      try {
-        const me = await apiRequest('/api/auth/me', { token });
+      const me = mePromise ? await mePromise : null;
+      if (me && me.user) {
         setCurrentUser(me.user);
         await refreshRoleData(me.user, token);
-      } catch {
+      } else {
         clearStoredToken();
         setToken('');
         setCurrentUser(null);
@@ -542,9 +548,8 @@ export default function App() {
     setTheme((prev) => (prev === 'night' ? 'day' : 'night'));
   }
 
-  if (loading) {
-    return <Preloader theme={theme} />;
-  }
+  // Render app immediately; show Preloader as overlay so child components can mount and fetch in parallel
+  // This avoids blocking component mount on bootstrap network requests.
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${appThemeClass}`}>
@@ -564,6 +569,7 @@ export default function App() {
         <Home
           events={events}
           topContributors={topContributors}
+          siteStats={siteStats}
           setSelectedEvent={setSelectedEventId}
           openEvents={openEvents}
           openGallery={() => navigateTo('gallery')}
@@ -659,6 +665,7 @@ export default function App() {
       )}
 
       <ChatbotWidget />
+      {loading && <Preloader theme={theme} overlay />}
     </div>
   );
 }

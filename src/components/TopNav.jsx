@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import logo from '../../public/logo.png';
+import logo from '/logo.avif';
 
 const roleItems = {
   volunteer: { page: 'volunteer', label: 'Volunteer' },

@@ -86,6 +86,19 @@ async function ensureEventOwnerCascadeDelete(db) {
   }
 }
 
+async function ensureIndex(db, table, indexName, columns) {
+  const exists = await db.get(
+    `SELECT 1 AS has_index
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?
+     LIMIT 1`,
+    [db.databaseName, table, indexName],
+  );
+  if (exists) return;
+  const cols = columns.map((c) => `\`${c}\``).join(', ');
+  await db.exec(`ALTER TABLE \`${table}\` ADD INDEX \`${indexName}\` (${cols})`);
+}
+
 function normalizeParams(params) {
   if (params.length === 1 && Array.isArray(params[0])) {
     return params[0];
@@ -334,6 +347,8 @@ export async function initDb() {
   await ensureColumn(db, 'users', 'department', 'VARCHAR(255)');
   await ensureLongTextColumn(db, 'users', 'profile_image');
   await ensureEventOwnerCascadeDelete(db);
+  // Ensure indexes useful for admin queries
+  await ensureIndex(db, 'users', 'idx_users_role_coordinator_created_at', ['role', 'coordinator_approved', 'created_at']);
   await ensureSinglePrimaryAdmin(db);
 
   console.log(`Connected to MySQL at ${mysqlConfig.host}:${mysqlConfig.port}/${mysqlConfig.database}`);

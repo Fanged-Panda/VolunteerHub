@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import cuetEgg from '../assets/cuet with egg.jpeg';
-import asif from '../assets/asif.jpg';
-import tsc from '../assets/tsc.jpg';
-import asrro from '../assets/z.jpg';
-import workshop from '../assets/workshop.jpg';
-import pulak from '../assets/pulak.jpg';
+
+import cuetEgg from '../assets/cuet with egg.avif';
+import asif from '../assets/asif.avif';
+import tsc from '../assets/tsc.avif';
+import asrro from '../assets/asrro.avif';
+import workshop from '../assets/workshop.avif';
+import pulak from '../assets/pulak.avif';
 
 const WORKFLOW_STEPS = [
   {
@@ -65,7 +66,14 @@ const IMPACT_QUOTES = [
   },
 ];
 
-export default function Home({ events = [], topContributors = [], setSelectedEvent, openEvents, openGallery }) {
+export default function Home({
+  events = [],
+  topContributors = [],
+  siteStats = {},
+  setSelectedEvent,
+  openEvents,
+  openGallery,
+}) {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const slides = useMemo(
@@ -121,12 +129,13 @@ export default function Home({ events = [], topContributors = [], setSelectedEve
   );
 
   const quickStats = useMemo(() => {
-    const activeClubs = new Set(activeEvents.map((event) => String(event.club || '').trim()).filter(Boolean)).size;
     const registered = activeEvents.reduce((sum, event) => sum + Number(event.registeredVolunteers || 0), 0);
     const slots = activeEvents.reduce(
       (sum, event) => sum + Number(event.neededVolunteers || event.needed_volunteers || 0),
       0,
     );
+    const registeredCoordinatorClubs = Number(siteStats.registeredCoordinatorClubs || 0);
+    const registeredVolunteers = Number(siteStats.registeredVolunteers || 0);
 
     return [
       {
@@ -134,11 +143,11 @@ export default function Home({ events = [], topContributors = [], setSelectedEve
         value: activeEvents.length,
         hint: hasUpcomingEvents ? 'Live now' : 'Latest listed',
       },
-      { label: 'Active Clubs', value: activeClubs, hint: 'Campus-wide' },
-      { label: 'Registered Volunteers', value: registered, hint: 'Current records' },
+      { label: 'Registered Clubs', value: registeredCoordinatorClubs, hint: 'Coordinator approved' },
+      { label: 'Registered Volunteers', value: registeredVolunteers, hint: 'User accounts' },
       { label: 'Open Slots', value: Math.max(slots - registered, 0), hint: 'Still available' },
     ];
-  }, [activeEvents, hasUpcomingEvents]);
+  }, [activeEvents, hasUpcomingEvents, siteStats]);
 
   const clubMomentum = useMemo(() => {
     const counts = {};
