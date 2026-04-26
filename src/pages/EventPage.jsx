@@ -62,16 +62,15 @@ export default function EventPage({
     };
   }, [filteredEvents]);
 
-  // Compute the selected event from the current filters and selectedEventId.
-  // If there are no filtered events, `selected` will be null so the details
-  // panel hides instead of showing an out-of-filter event.
+  // Keep details panel in sync with current filters.
+  // When selected event is filtered out, fall back to first visible event.
   const selected = useMemo(() => {
     if (selectedEventId) {
-      const found = events.find((event) => event.id === selectedEventId);
+      const found = filteredEvents.find((event) => event.id === selectedEventId);
       if (found) return found;
     }
     return filteredEvents.length ? filteredEvents[0] : null;
-  }, [selectedEventId, events, filteredEvents]);
+  }, [selectedEventId, filteredEvents]);
 
   function getApplicationForEvent(eventId) {
     if (!currentUser || currentUser.role !== 'volunteer') return null;

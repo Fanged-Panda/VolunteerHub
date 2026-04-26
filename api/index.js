@@ -1001,6 +1001,7 @@ app.delete('/api/admin/events/:id', authRequired, roleRequired('admin'), async (
 app.post('/api/chatbot/ask', async (req, res) => {
   try {
     const question = String(req.body?.question || '').trim();
+    const todayKey = new Date().toISOString().slice(0, 10);
     if (!question) {
       return res.status(400).json({ error: 'Question is required.' });
     }
@@ -1019,8 +1020,10 @@ app.post('/api/chatbot/ask', async (req, res) => {
       db.all(
         `SELECT title, date, location, club
          FROM events
+         WHERE date >= ?
          ORDER BY date ASC, id DESC
          LIMIT 8`,
+        [todayKey],
       ),
     ]);
 
