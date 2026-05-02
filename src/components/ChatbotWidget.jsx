@@ -135,7 +135,7 @@ export default function ChatbotWidget() {
   }
 
   return (
-    <div ref={widgetRef} className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6">
+    <div ref={widgetRef} className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6" style={{ viewTransitionName: 'chatbot' }}>
       {isOpen && (
         <div className="mb-3 flex h-[30rem] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-2xl border border-orange-200 bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-orange-100 bg-orange-50 px-4 py-3">

@@ -1,0 +1,14 @@
+# VolunteerHub robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /login
+Disallow: /*.json
+Disallow: /node_modules
+
+# Crawl delay to be respectful
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://volunteer-hub-three.vercel.app/sitemap.xml

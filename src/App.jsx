@@ -1,19 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import Home from './pages/Home';
-import About from './pages/About';
-import Gallery from './pages/GalleryAlt';
-import VolunteerDashboard from './pages/VolunteerDashboard';
-import EventPage from './pages/EventPage';
-import CoordinatorDashboard from './pages/CoordinatorDashboard';
-import AdminPanel from './pages/AdminPanel';
-import AuthPage from './pages/AuthPage';
 import TopNav from './components/TopNav';
 import Preloader from './components/Preloader';
-import ChatbotWidget from './components/ChatbotWidget';
 import { apiRequest, clearStoredToken, getStoredToken, setStoredToken } from './lib/api';
+import { prefetchAllRoutes } from './lib/prefetch';
+
+const About = lazy(() => import('./pages/About'));
+const Gallery = lazy(() => import('./pages/GalleryAlt'));
+const VolunteerDashboard = lazy(() => import('./pages/VolunteerDashboard'));
+const EventPage = lazy(() => import('./pages/EventPage'));
+const CoordinatorDashboard = lazy(() => import('./pages/CoordinatorDashboard'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const AuthPage = lazy(() => import('./pages/AuthPage'));
+const ChatbotWidget = lazy(() => import('./components/ChatbotWidget'));
 
 const PAGE_SET = new Set(['home', 'about', 'gallery', 'events', 'auth', 'login', 'register', 'volunteer', 'coordinator', 'admin']);
 const THEME_STORAGE_KEY = 'vh_theme';
+
+// Navigation order for directional transitions
+const NAV_ORDER = ['home', 'about', 'events', 'gallery', 'volunteer', 'coordinator', 'admin', 'auth', 'login', 'register'];
 
 function normalizePathname(pathname) {
   if (!pathname || pathname === '/') return '/';
@@ -82,6 +87,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(() => readInitialTheme());
   const [authFormKey, setAuthFormKey] = useState(0);
+  const [showChatbot, setShowChatbot] = useState(false);
 
   const isNight = theme === 'night';
 
@@ -98,13 +104,51 @@ export default function App() {
     window.history.pushState({ page, eventId }, '', url);
   }
 
+  function getNavDirection(fromPage, toPage) {
+    const fromIndex = NAV_ORDER.indexOf(fromPage);
+    const toIndex = NAV_ORDER.indexOf(toPage);
+    if (fromIndex === -1 || toIndex === -1) return 'forward';
+    return toIndex > fromIndex ? 'forward' : 'backward';
+  }
+
   function navigateTo(page, options = {}) {
     const { eventId, replaceHistory = false, fromPop = false } = options;
     const nextEventId = typeof eventId === 'undefined' ? selectedEventId : eventId;
-    setCurrentPage(page);
-    setSelectedEventId(nextEventId ?? null);
-    if (!fromPop) {
-      syncRoute(page, nextEventId, replaceHistory);
+
+    // Skip navigation if already on the same page (no transition needed)
+    if (!fromPop && page === currentPage && nextEventId === selectedEventId) {
+      return;
+    }
+
+    // Determine navigation direction for transition animation
+    const direction = getNavDirection(currentPage, page);
+
+    // Trigger View Transition for smooth page change (if supported by browser)
+    if (!fromPop && typeof document !== 'undefined' && document.startViewTransition) {
+      // Set class for direction before transition
+      document.documentElement.classList.remove('vh-nav-forward', 'vh-nav-backward');
+      document.documentElement.classList.add(direction === 'forward' ? 'vh-nav-forward' : 'vh-nav-backward');
+
+      const transition = document.startViewTransition(() => {
+        setCurrentPage(page);
+        setSelectedEventId(nextEventId ?? null);
+        if (!replaceHistory) {
+          syncRoute(page, nextEventId, false);
+        } else {
+          syncRoute(page, nextEventId, true);
+        }
+      });
+
+      // Clear the class after transition completes
+      transition.finished.then(() => {
+        document.documentElement.classList.remove('vh-nav-forward', 'vh-nav-backward');
+      });
+    } else {
+      setCurrentPage(page);
+      setSelectedEventId(nextEventId ?? null);
+      if (!fromPop) {
+        syncRoute(page, nextEventId, replaceHistory);
+      }
     }
   }
 
@@ -179,53 +223,84 @@ export default function App() {
   }
 
   async function bootstrap() {
-    setLoading(true);
-    try {
-      // Parallelize independent bootstrap requests to avoid waterfall
-      const clubsPromise = apiRequest('/api/meta/clubs', { token: '' }).catch(() => ({ clubs: [], availableCoordinatorClubs: [] }));
+    // CRITICAL PATH: Load only essential data for initial render
+    const loadCriticalData = async () => {
       const eventsPromise = apiRequest('/api/events').catch(() => ({ events: [] }));
-      const contributorsPromise = apiRequest('/api/meta/top-contributors', { token: '' }).catch(() => ({ contributors: [] }));
-      const statsPromise = apiRequest('/api/meta/stats', { token: '' }).catch(() => ({ registeredVolunteers: 0, registeredCoordinatorClubs: 0 }));
-
-      // If we have a token, start fetching current user in parallel so it can resolve while other requests run
       const mePromise = token ? apiRequest('/api/auth/me', { token }).catch(() => null) : null;
 
-      const [clubsData, eventsData, contributorsData, statsData] = await Promise.all([
-        clubsPromise,
-        eventsPromise,
-        contributorsPromise,
-        statsPromise,
-      ]);
-
-      const allClubs = Array.isArray(clubsData.clubs) ? clubsData.clubs : [];
-      const availableCoordinatorClubs = Array.isArray(clubsData.availableCoordinatorClubs)
-        ? clubsData.availableCoordinatorClubs
-        : allClubs;
-      setClubs(availableCoordinatorClubs);
-
+      const eventsData = await eventsPromise;
       setEvents(Array.isArray(eventsData.events) ? eventsData.events : []);
-      setTopContributors(Array.isArray(contributorsData.contributors) ? contributorsData.contributors : []);
-      setSiteStats({
-        registeredVolunteers: Number(statsData.registeredVolunteers || 0),
-        registeredCoordinatorClubs: Number(statsData.registeredCoordinatorClubs || 0),
-      });
 
       if (!token) {
         setCurrentUser(null);
         await refreshRoleData(null, '');
-        return;
+        return null;
       }
 
       const me = mePromise ? await mePromise : null;
       if (me && me.user) {
         setCurrentUser(me.user);
         await refreshRoleData(me.user, token);
+        return me.user;
       } else {
         clearStoredToken();
         setToken('');
         setCurrentUser(null);
         await refreshRoleData(null, '');
+        return null;
       }
+    };
+
+    // NON-CRITICAL PATH: Load metadata after initial render (deferred)
+    const loadDeferredMetadata = async () => {
+      try {
+        const [clubsData, statsData, contributorsData] = await Promise.all([
+          apiRequest('/api/meta/clubs', { token: '' }).catch(() => ({ clubs: [], availableCoordinatorClubs: [] })),
+          apiRequest('/api/meta/stats', { token: '' }).catch(() => ({ registeredVolunteers: 0, registeredCoordinatorClubs: 0 })),
+          apiRequest('/api/meta/top-contributors', { token: '' }).catch(() => ({ contributors: [] })),
+        ]);
+
+        const allClubs = Array.isArray(clubsData.clubs) ? clubsData.clubs : [];
+        const availableCoordinatorClubs = Array.isArray(clubsData.availableCoordinatorClubs)
+          ? clubsData.availableCoordinatorClubs
+          : allClubs;
+        setClubs(availableCoordinatorClubs);
+
+        setSiteStats({
+          registeredVolunteers: Number(statsData.registeredVolunteers || 0),
+          registeredCoordinatorClubs: Number(statsData.registeredCoordinatorClubs || 0),
+        });
+
+        setTopContributors(Array.isArray(contributorsData.contributors) ? contributorsData.contributors : []);
+      } catch {
+        // Silently fail for non-critical metadata
+      }
+    };
+
+    // Load critical data immediately for visible pages, deferred for home
+    if (currentPage === 'home') {
+      // Keep the preloader visible until the first screen is ready.
+      void (async () => {
+        try {
+          await loadCriticalData();
+        } finally {
+          setLoading(false);
+        }
+      })();
+
+      // Load metadata in background after the first paint.
+      const schedule = window.requestIdleCallback || ((callback) => window.setTimeout(callback, 0));
+      const idleId = schedule(() => {
+        void loadDeferredMetadata();
+      });
+      return () => (window.cancelIdleCallback || window.clearTimeout)(idleId);
+    }
+
+    setLoading(true);
+    try {
+      await loadCriticalData();
+      // For non-home pages, load metadata after critical data
+      void loadDeferredMetadata();
     } finally {
       setLoading(false);
     }
@@ -234,6 +309,14 @@ export default function App() {
   useEffect(() => {
     bootstrap();
   }, []);
+
+  // Defer ChatbotWidget loading until page is stable (improves LCP)
+  useEffect(() => {
+    const timer = setTimeout(() => setShowChatbot(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Note: Route prefetching is now handled in main.jsx for earlier loading
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -576,95 +659,99 @@ export default function App() {
         />
       )}
 
-      {currentPage === 'about' && <About theme={theme} />}
+      <Suspense fallback={<Preloader theme={theme} overlay />}>
+        {currentPage === 'about' && <About theme={theme} />}
 
-      {currentPage === 'gallery' && <Gallery theme={theme} />}
+        {currentPage === 'gallery' && <Gallery theme={theme} />}
 
-      {currentPage === 'events' && (
-        <EventPage
-          events={events}
-          currentUser={currentUser}
-          applications={applications}
-          selectedEventId={selectedEventId}
-          setSelectedEvent={setSelectedEventId}
-          onRequireLogin={(eventId) => requireLogin({ page: 'events', eventId })}
-          onApply={handleApply}
-          onCancelApplication={handleCancelApplication}
-        />
-      )}
+        {currentPage === 'events' && (
+          <EventPage
+            events={events}
+            currentUser={currentUser}
+            applications={applications}
+            selectedEventId={selectedEventId}
+            setSelectedEvent={setSelectedEventId}
+            onRequireLogin={(eventId) => requireLogin({ page: 'events', eventId })}
+            onApply={handleApply}
+            onCancelApplication={handleCancelApplication}
+          />
+        )}
 
-      {(currentPage === 'auth' || currentPage === 'login' || currentPage === 'register') && (
-        <AuthPage
-          key={`auth-main-${currentPage}-${authFormKey}`}
-          mode={currentPage === 'register' ? 'register' : 'login'}
-          clubs={clubs}
-          onLogin={handleLogin}
-          onRequestVerification={handleRequestVerification}
-          onRegister={handleRegister}
-          onForgotPasswordRequest={handleForgotPasswordRequest}
-          onForgotPasswordReset={handleForgotPasswordReset}
-          onGoLogin={() => navigateTo('login')}
-          onGoRegister={() => navigateTo('register')}
-          onLoadUserData={handleLoadUserData}
-        />
-      )}
+        {(currentPage === 'auth' || currentPage === 'login' || currentPage === 'register') && (
+          <AuthPage
+            key={`auth-main-${currentPage}-${authFormKey}`}
+            mode={currentPage === 'register' ? 'register' : 'login'}
+            clubs={clubs}
+            onLogin={handleLogin}
+            onRequestVerification={handleRequestVerification}
+            onRegister={handleRegister}
+            onForgotPasswordRequest={handleForgotPasswordRequest}
+            onForgotPasswordReset={handleForgotPasswordReset}
+            onGoLogin={() => navigateTo('login')}
+            onGoRegister={() => navigateTo('register')}
+            onLoadUserData={handleLoadUserData}
+          />
+        )}
 
-      {currentPage === 'volunteer' && canAccess('volunteer') && (
-        <VolunteerDashboard
-          events={events}
-          currentUser={currentUser}
-          applications={applications}
-          onBrowseEvents={() => navigateTo('events')}
-          onOpenEvent={openEvents}
-          onToggleTaskComplete={handleVolunteerTaskComplete}
-        />
-      )}
+        {currentPage === 'volunteer' && canAccess('volunteer') && (
+          <VolunteerDashboard
+            events={events}
+            currentUser={currentUser}
+            applications={applications}
+            onBrowseEvents={() => navigateTo('events')}
+            onOpenEvent={openEvents}
+            onToggleTaskComplete={handleVolunteerTaskComplete}
+          />
+        )}
 
-      {currentPage === 'coordinator' && canAccess('coordinator') && (
-        <CoordinatorDashboard
-          currentUser={currentUser}
-          myEvents={myEvents}
-          applications={coordinatorApplications}
-          onCreateOrUpdateEvent={handleCreateOrUpdateEvent}
-          onDecision={handleDecision}
-          onAssignment={handleAssignment}
-        />
-      )}
+        {currentPage === 'coordinator' && canAccess('coordinator') && (
+          <CoordinatorDashboard
+            currentUser={currentUser}
+            myEvents={myEvents}
+            applications={coordinatorApplications}
+            onCreateOrUpdateEvent={handleCreateOrUpdateEvent}
+            onDecision={handleDecision}
+            onAssignment={handleAssignment}
+          />
+        )}
 
-      {currentPage === 'admin' && canAccess('admin') && (
-        <AdminPanel
-          currentUser={currentUser}
-          users={adminUsers}
-          pendingCoordinators={pendingCoordinators}
-          events={events}
-          totalUsers={adminTotalUsers}
-          totalEvents={adminTotalEvents}
-          onApproveCoordinator={handleApproveCoordinator}
-          onRejectCoordinator={handleRejectCoordinator}
-          onRemoveUser={handleRemoveUser}
-          onRemoveEvent={handleRemoveEvent}
-        />
-      )}
+        {currentPage === 'admin' && canAccess('admin') && (
+          <AdminPanel
+            currentUser={currentUser}
+            users={adminUsers}
+            pendingCoordinators={pendingCoordinators}
+            events={events}
+            totalUsers={adminTotalUsers}
+            totalEvents={adminTotalEvents}
+            onApproveCoordinator={handleApproveCoordinator}
+            onRejectCoordinator={handleRejectCoordinator}
+            onRemoveUser={handleRemoveUser}
+            onRemoveEvent={handleRemoveEvent}
+          />
+        )}
 
-      {((currentPage === 'volunteer' && !canAccess('volunteer')) ||
-        (currentPage === 'coordinator' && !canAccess('coordinator')) ||
-        (currentPage === 'admin' && !canAccess('admin'))) && (
-        <AuthPage
-          key={`auth-guard-${authFormKey}`}
-          mode="login"
-          clubs={clubs}
-          onLogin={handleLogin}
-          onRequestVerification={handleRequestVerification}
-          onRegister={handleRegister}
-          onForgotPasswordRequest={handleForgotPasswordRequest}
-          onForgotPasswordReset={handleForgotPasswordReset}
-          onGoLogin={() => navigateTo('login')}
-          onGoRegister={() => navigateTo('register')}
-          onLoadUserData={handleLoadUserData}
-        />
-      )}
+        {((currentPage === 'volunteer' && !canAccess('volunteer')) ||
+          (currentPage === 'coordinator' && !canAccess('coordinator')) ||
+          (currentPage === 'admin' && !canAccess('admin'))) && (
+          <AuthPage
+            key={`auth-guard-${authFormKey}`}
+            mode="login"
+            clubs={clubs}
+            onLogin={handleLogin}
+            onRequestVerification={handleRequestVerification}
+            onRegister={handleRegister}
+            onForgotPasswordRequest={handleForgotPasswordRequest}
+            onForgotPasswordReset={handleForgotPasswordReset}
+            onGoLogin={() => navigateTo('login')}
+            onGoRegister={() => navigateTo('register')}
+            onLoadUserData={handleLoadUserData}
+          />
+        )}
+      </Suspense>
 
-      <ChatbotWidget />
+      <Suspense fallback={null}>
+        {showChatbot && <ChatbotWidget />}
+      </Suspense>
       {loading && <Preloader theme={theme} overlay />}
     </div>
   );

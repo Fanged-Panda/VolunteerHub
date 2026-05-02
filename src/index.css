@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+	font-family: 'Kaushan Script';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('/fonts/KaushanScript-latin.woff2') format('woff2');
+}
+
 :root {
 	color-scheme: light;
 	--vh-orange-day: #f97316;
@@ -30,6 +38,177 @@ html[data-theme='night'] {
 
 body {
 	transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ==========================================
+   FORWARD NAVIGATION
+   New page slides in from the right
+   Old page slides out to the left
+   ========================================== */
+.vh-nav-forward::view-transition-old(root) {
+	animation: slide-out-left 0.35s ease-in-out both;
+}
+
+.vh-nav-forward::view-transition-new(root) {
+	animation: slide-in-from-right 0.35s ease-in-out both;
+}
+
+/* ==========================================
+   BACKWARD NAVIGATION
+   New page slides in from the left
+   Old page slides out to the right
+   ========================================== */
+.vh-nav-backward::view-transition-old(root) {
+	animation: slide-out-right 0.35s ease-in-out both;
+}
+
+.vh-nav-backward::view-transition-new(root) {
+	animation: slide-in-from-left 0.35s ease-in-out both;
+}
+
+/* ==========================================
+   EXCLUDE STATIC ELEMENTS FROM TRANSITIONS
+   TopNav and ChatWidget should not move
+   ========================================== */
+::view-transition-group(nav-bar),
+::view-transition-group(chatbot) {
+	animation: none !important;
+}
+
+::view-transition-image-pair(nav-bar),
+::view-transition-image-pair(chatbot) {
+	isolation: auto;
+}
+
+::view-transition-old(nav-bar),
+::view-transition-new(nav-bar),
+::view-transition-old(chatbot),
+::view-transition-new(chatbot) {
+	animation: none !important;
+	mix-blend-mode: normal;
+}
+
+/* Slide animations */
+@keyframes slide-out-left {
+	from {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	to {
+		transform: translateX(-25%);
+		opacity: 0;
+	}
+}
+
+@keyframes slide-in-from-right {
+	from {
+		transform: translateX(25%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+@keyframes slide-out-right {
+	from {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	to {
+		transform: translateX(25%);
+		opacity: 0;
+	}
+}
+
+@keyframes slide-in-from-left {
+	from {
+		transform: translateX(-25%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+/* Simple fade for theme-only changes (when no nav direction is set) */
+::view-transition-old(root):not(html[data-vh-nav-direction] *),
+::view-transition-new(root):not(html[data-vh-nav-direction] *) {
+	/* These will only apply when there's no navigation direction */
+}
+
+/* ==========================================
+   CAROUSEL SLIDE TRANSITIONS
+   Directional slide animations for home page carousel
+   ========================================== */
+
+/* Carousel container with view-transition-name for slide animations */
+.vh-carousel-slide {
+	view-transition-name: carousel-slide;
+}
+
+/* Next slide animation - new image slides in from right */
+::view-transition-old(carousel-slide) {
+	animation: carousel-slide-out-left 0.4s ease-in-out both;
+}
+
+::view-transition-new(carousel-slide) {
+	animation: carousel-slide-in-from-right 0.4s ease-in-out both;
+}
+
+/* Prev slide animation - new image slides in from left */
+html[data-vh-carousel-direction="prev"]::view-transition-old(carousel-slide) {
+	animation: carousel-slide-out-right 0.4s ease-in-out both;
+}
+
+html[data-vh-carousel-direction="prev"]::view-transition-new(carousel-slide) {
+	animation: carousel-slide-in-from-left 0.4s ease-in-out both;
+}
+
+@keyframes carousel-slide-out-left {
+	from {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	to {
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+}
+
+@keyframes carousel-slide-in-from-right {
+	from {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+@keyframes carousel-slide-out-right {
+	from {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	to {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+}
+
+@keyframes carousel-slide-in-from-left {
+	from {
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
 }
 
 .vh-hide-scrollbar {

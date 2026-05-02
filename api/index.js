@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
@@ -27,6 +28,8 @@ const PRIMARY_ADMIN_EMAIL = 'admin@student.cuet.ac.bd';
 const MAX_PROFILE_IMAGE_PAYLOAD_BYTES = 62_000;
 
 const app = express();
+
+app.use(compression());
 
 app.use(
   cors({

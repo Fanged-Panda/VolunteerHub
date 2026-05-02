@@ -4,13 +4,91 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.avif" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&display=swap" rel="stylesheet" />
-    <title>Volunteer Hub</title>
+    <meta name="description" content="VolunteerHub - Discover, manage, and participate in volunteer opportunities. Connect with your community and make a difference through meaningful volunteer work." />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph Tags for Social Media Sharing -->
+    <meta property="og:title" content="VolunteerHub - Volunteer Opportunities & Community Impact" />
+    <meta property="og:description" content="Discover, manage, and participate in volunteer opportunities. Connect with your community and make a difference through meaningful volunteer work." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" id="og-image" content="https://volunteer-hub-three.vercel.app/logo.avif" />
+    <meta property="og:url" id="og-url" content="https://volunteer-hub-three.vercel.app/" />
+    
+    <!-- Twitter Card Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VolunteerHub - Volunteer Opportunities & Community Impact" />
+    <meta name="twitter:description" content="Discover, manage, and participate in volunteer opportunities. Connect with your community and make a difference." />
+    <meta name="twitter:image" id="twitter-image" content="https://volunteer-hub-three.vercel.app/logo.avif" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" id="canonical" href="https://volunteer-hub-three.vercel.app/" />
+
+    <!-- Critical CSS removed: revert preloader-first-paint changes -->
+    
+    <!-- Preload critical font for above-the-fold text -->
+    <link rel="preload" href="/fonts/KaushanScript-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Preload LCP image with high priority to ensure it loads before other resources -->
+    <link rel="preload" as="image" href="/src/assets/cuet%20with%20egg.avif" type="image/avif" fetchpriority="high" />
+    <!-- Defer non-critical resources to background -->
+    <link rel="preconnect" href="http://localhost:4000" />
+    <title>VolunteerHub - Discover Volunteer Opportunities & Make an Impact</title>
+
+    <!-- Dynamic URL configuration script (runs before React hydrates) -->
+    <script>
+      (function() {
+        const siteUrl = window.location.hostname === 'localhost' 
+          ? 'http://localhost:5173/' 
+          : 'https://volunteer-hub-three.vercel.app/';
+        const siteUrlBase = siteUrl.replace(/\/$/, '');
+        const logoUrl = siteUrlBase + '/logo.avif';
+        
+        // Update OG and Twitter tags
+        document.getElementById('og-image').setAttribute('content', logoUrl);
+        document.getElementById('og-url').setAttribute('content', siteUrl);
+        document.getElementById('twitter-image').setAttribute('content', logoUrl);
+        document.getElementById('canonical').setAttribute('href', siteUrl);
+      })();
+    </script>
+
+    <!-- Speculation Rules API for prerendering/prefetching -->
+    <script type="speculationrules">
+      {
+        "prerender": [
+          {
+            "source": "document",
+            "where": {
+              "and": [
+                { "href_matches": "/*" },
+                { "not": { "href_matches": ["/api/*", "/*\\.*", "/assets/*"] } }
+              ]
+            },
+            "eagerness": "moderate"
+          }
+        ],
+        "prefetch": [
+          {
+            "source": "document",
+            "where": {
+              "and": [
+                { "href_matches": "/*" },
+                { "not": { "href_matches": ["/api/*", "/*\\.*", "/assets/*"] } }
+              ]
+            },
+            "eagerness": "conservative"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" class="sr-only focus:not-sr-only">Skip to main content</a>
+    
+    <div id="root">
+      <!-- Fallback content for search engine crawlers and users with JavaScript disabled -->
+      <h1>VolunteerHub - Discover Volunteer Opportunities</h1>
+      <p>Connect with your community through meaningful volunteer work. Discover opportunities, manage your commitments, and make a positive impact today.</p>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

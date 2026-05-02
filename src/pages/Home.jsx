@@ -1,11 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 
+// Only import first slide statically, lazy-load others
 import cuetEgg from '../assets/cuet with egg.avif';
-import asif from '../assets/asif.avif';
-import tsc from '../assets/tsc.avif';
-import asrro from '../assets/asrro.avif';
-import workshop from '../assets/workshop.avif';
-import pulak from '../assets/pulak.avif';
 
 const WORKFLOW_STEPS = [
   {
@@ -75,17 +71,51 @@ export default function Home({
   openGallery,
 }) {
   const [activeSlide, setActiveSlide] = useState(0);
+  const [slideDirection, setSlideDirection] = useState('next'); // 'next' or 'prev'
+  const [lazyImages, setLazyImages] = useState({});
+  const eventRailRef = useRef(null);
+
+  // Pre-load non-critical slide images on mount
+  useEffect(() => {
+    const imageImports = async () => {
+      try {
+        const images = await Promise.all([
+          import('../assets/asif.avif'),
+          import('../assets/tsc.avif'),
+          import('../assets/asrro.avif'),
+          import('../assets/workshop.avif'),
+          import('../assets/pulak.avif'),
+        ]);
+        setLazyImages({
+          asif: images[0].default,
+          tsc: images[1].default,
+          asrro: images[2].default,
+          workshop: images[3].default,
+          pulak: images[4].default,
+        });
+      } catch {
+        // Fail silently if images can't load
+      }
+    };
+
+    // Load images after page paint
+    const timer = setTimeout(() => {
+      imageImports();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const slides = useMemo(
     () => [
       { src: cuetEgg, alt: 'CUET iconic building', label: 'CUET with Egg' },
-      { src: asif, alt: 'asif', label: 'computer club reception' },
-      { src: tsc, alt: 'TSC cafeteria', label: 'TSC Cafeteria' },
-      { src: asrro, alt: 'ASRRO', label: 'ASRRO' },
-      { src: workshop, alt: 'ASRRO', label: 'Workshop' },
-      { src: pulak, alt: 'pulak', label: 'pulak' },
+      { src: lazyImages.asif || '', alt: 'asif', label: 'computer club reception' },
+      { src: lazyImages.tsc || '', alt: 'TSC cafeteria', label: 'TSC Cafeteria' },
+      { src: lazyImages.asrro || '', alt: 'ASRRO', label: 'ASRRO' },
+      { src: lazyImages.workshop || '', alt: 'ASRRO', label: 'Workshop' },
+      { src: lazyImages.pulak || '', alt: 'pulak', label: 'pulak' },
     ],
-    [],
+    [lazyImages],
   );
 
   const todayKey = useMemo(() => {
@@ -99,15 +129,20 @@ export default function Home({
   const upcomingEvents = useMemo(() => events.filter((event) => event.date >= todayKey), [events, todayKey]);
   const hasUpcomingEvents = upcomingEvents.length > 0;
 
+  const recentEvents = useMemo(
+    () => [...events].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8),
+    [events],
+  );
+
   const activeEvents = useMemo(() => {
     if (hasUpcomingEvents) return upcomingEvents.slice(0, 8);
-    return [...events]
-      .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .slice(0, 8);
-  }, [events, hasUpcomingEvents, upcomingEvents]);
+    return recentEvents;
+  }, [hasUpcomingEvents, recentEvents, upcomingEvents]);
 
-  const marqueeEvents = useMemo(() => (activeEvents.length ? [...activeEvents, ...activeEvents] : []), [activeEvents]);
-  const timelineEvents = useMemo(() => activeEvents.slice(0, 5), [activeEvents]);
+  const timelineEvents = useMemo(
+    () => (hasUpcomingEvents ? upcomingEvents.slice(0, 5) : recentEvents.slice(0, 5)),
+    [hasUpcomingEvents, recentEvents, upcomingEvents],
+  );
   const contributorCards = useMemo(
     () => [...topContributors]
       .map((person) => ({
@@ -151,7 +186,7 @@ export default function Home({
 
   const clubMomentum = useMemo(() => {
     const counts = {};
-    activeEvents.forEach((event) => {
+    events.forEach((event) => {
       const club = String(event.club || 'Unknown Club');
       counts[club] = (counts[club] || 0) + 1;
     });
@@ -169,22 +204,60 @@ export default function Home({
               ? 'bg-sky-100 text-sky-700'
               : 'bg-emerald-100 text-emerald-700',
       }));
-  }, [activeEvents]);
+  }, [events]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
+      setSlideDirection('next');
       setActiveSlide((prev) => (prev + 1) % slides.length);
     }, 3500);
 
     return () => window.clearInterval(timer);
   }, [slides.length]);
 
+  // Scroll-to-slide: convert page scroll into horizontal card movement
+  useEffect(() => {
+    let ticking = false;
+    let lastScrollY = 0;
+
+    function updateRailScroll() {
+      const rail = eventRailRef.current;
+      if (!rail) return;
+
+      const scrollDelta = window.scrollY - lastScrollY;
+      if (scrollDelta !== 0) {
+        rail.scrollLeft += scrollDelta * 0.5;
+      }
+      lastScrollY = window.scrollY;
+      ticking = false;
+    }
+
+    function handleScroll() {
+      if (!ticking) {
+        requestAnimationFrame(updateRailScroll);
+        ticking = true;
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   function goPrev() {
+    setSlideDirection('prev');
     setActiveSlide((prev) => (prev - 1 + slides.length) % slides.length);
   }
 
   function goNext() {
+    setSlideDirection('next');
     setActiveSlide((prev) => (prev + 1) % slides.length);
+  }
+
+  function goToSlide(index) {
+    if (index === activeSlide) return;
+    const current = activeSlide;
+    setSlideDirection(index > current ? 'next' : 'prev');
+    setActiveSlide(index);
   }
 
   function openEventDetails(eventId) {
@@ -193,7 +266,7 @@ export default function Home({
   }
 
   return (
-    <main className="relative overflow-hidden">
+    <main id="main-content" className="relative overflow-hidden">
       <section className="relative overflow-hidden">
         <div className="vh-grid-pattern absolute inset-0 opacity-40" />
         <div className="vh-float-slow absolute -left-24 top-12 h-56 w-56 rounded-full bg-orange-300/30 blur-3xl" />
@@ -215,7 +288,7 @@ export default function Home({
             <div className="mt-8 flex flex-wrap gap-3">
               <button
                 onClick={() => openEvents()}
-                className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-600"
+                className="rounded-xl bg-orange-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-200 transition hover:bg-orange-700"
               >
                 Explore Events
               </button>
@@ -229,23 +302,21 @@ export default function Home({
           </div>
 
           <div
-            className="relative cursor-pointer overflow-hidden rounded-3xl border border-amber-200/80 shadow-2xl"
+            className="relative h-[320px] cursor-pointer overflow-hidden rounded-3xl border border-amber-200/80 shadow-2xl sm:h-[460px]"
             onClick={() => openGallery?.()}
           >
-            {slides.map((slide, index) => (
-              <img
-                key={slide.label}
-                src={slide.src}
-                alt={slide.alt}
-                  className={`absolute left-0 top-0 h-[320px] w-full object-cover transition-opacity duration-700 sm:h-[460px] ${
-                  index === activeSlide ? 'opacity-100' : 'opacity-0'
-                }`}
-              />
-            ))}
+            <img
+              key={slides[activeSlide].label}
+              src={slides[activeSlide].src}
+              alt={slides[activeSlide].alt}
+              fetchPriority="high"
+              decoding="async"
+              className={`absolute inset-0 h-full w-full object-cover ${slideDirection === 'prev' ? 'vh-home-slide-prev' : 'vh-home-slide-next'}`}
+            />
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
 
-            <div className="relative flex h-[320px] items-end justify-between p-4 sm:h-[460px]">
+            <div className="relative flex h-full items-end justify-between p-4">
               <div className="rounded-full bg-black/55 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
                 {slides[activeSlide].label}
               </div>
@@ -280,7 +351,7 @@ export default function Home({
                   key={slide.label + '-dot'}
                   onClick={(event) => {
                     event.stopPropagation();
-                    setActiveSlide(index);
+                    goToSlide(index);
                   }}
                   className={`h-2.5 rounded-full transition-all ${index === activeSlide ? 'w-7 bg-orange-500' : 'w-2.5 bg-white/80'}`}
                   aria-label={`Go to ${slide.label}`}
@@ -303,23 +374,30 @@ export default function Home({
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-2xl font-black text-slate-900">{hasUpcomingEvents ? 'Upcoming Events' : 'Recent Events'}</h2>
-          {!hasUpcomingEvents && events.length > 0 && (
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">No future dates found</p>
+      <section className="pb-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-black text-slate-900">{hasUpcomingEvents ? 'Upcoming Events' : 'Recent Events'}</h2>
+            {!hasUpcomingEvents && events.length > 0 && (
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">No future dates found</p>
+            )}
+          </div>
+
+          {activeEvents.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No events available right now.</p>
+          ) : (
+            <p className="text-sm text-slate-500"></p>
           )}
         </div>
 
-        {activeEvents.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">No events available right now.</p>
-        ) : (
-          <div className="vh-marquee">
-            <div className="vh-marquee-track">
-              {marqueeEvents.map((event, index) => (
+        <div ref={eventRailRef} className="vh-hide-scrollbar mt-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:px-6 lg:px-8">
+          {activeEvents.length > 0 && (
+            <>
+              <div className="shrink-0 w-[1px] sm:w-[calc(50vw-18rem)] lg:w-[calc(50vw-24rem)]" aria-hidden="true" />
+              {activeEvents.map((event) => (
                 <article
-                  key={`${event.id}-${index}`}
-                  className="mr-4 flex h-[19rem] w-[19rem] shrink-0 flex-col rounded-2xl border border-amber-100 bg-white p-5 shadow-sm"
+                  key={event.id}
+                  className="flex h-[19rem] w-[85vw] max-w-[19rem] shrink-0 flex-col rounded-2xl border border-amber-100 bg-white p-5 shadow-sm sm:w-[19rem]"
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-700">{event.club}</p>
@@ -336,9 +414,10 @@ export default function Home({
                   </button>
                 </article>
               ))}
-            </div>
-          </div>
-        )}
+              <div className="shrink-0 w-[1px] sm:w-[calc(50vw-18rem)] lg:w-[calc(50vw-24rem)]" aria-hidden="true" />
+            </>
+          )}
+        </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
@@ -394,6 +473,11 @@ export default function Home({
             <p className="mt-3 text-sm leading-relaxed text-slate-600">
               Track the next set of opportunities and jump directly into any event details.
             </p>
+            {!hasUpcomingEvents && events.length > 0 && (
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                No upcoming events found, showing the most recent events instead.
+              </p>
+            )}
 
             <div className="mt-6 space-y-3">
               {timelineEvents.length === 0 && (
@@ -437,7 +521,7 @@ export default function Home({
               <article key={item.club} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-base font-black text-slate-900">{item.club}</p>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${item.tone}`}>{item.count} upcoming</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${item.tone}`}>{item.count} events</span>
                 </div>
                 <div className="mt-3 h-2 rounded-full bg-slate-100">
                   <div
